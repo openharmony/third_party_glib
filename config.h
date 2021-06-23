@@ -307,8 +307,6 @@
 
 #define HAVE_UNSETENV 1
 
-#define HAVE_USELOCALE 1
-
 #define HAVE_UTIMES 1
 
 #define HAVE_VASPRINTF 1
@@ -328,8 +326,6 @@
 #define HAVE_WINT_T 1
 
 #define HAVE_XATTR 1
-
-#define HAVE_XLOCALE_H 1
 
 #define MAJOR_IN_SYSMACROS 1
 
