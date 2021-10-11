@@ -167,7 +167,7 @@ ohos_shared_library("glib") {
     deps = [
         ":glib_source",
     ]
-    part_name = "multimedia_histreamer"
+    part_name = "multimedia_media_standard"
     subsystem_name = "multimedia"
 }
 
@@ -198,7 +198,7 @@ ohos_shared_library("gmodule") {
         ":gmodule_source",
         ":glib",
     ]
-    part_name = "multimedia_histreamer"
+    part_name = "multimedia_media_standard"
     subsystem_name = "multimedia"
 }
 
@@ -253,6 +253,6 @@ ohos_shared_library("gobject") {
         ":glib",
         "//third_party/libffi:ffi",
     ]
-    part_name = "multimedia_histreamer"
+    part_name = "multimedia_media_standard"
     subsystem_name = "multimedia"
 }
