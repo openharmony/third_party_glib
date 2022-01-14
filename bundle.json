@@ -1,0 +1,40 @@
+{
+    "name": "@ohos/glib",
+    "version": "",
+    "description": "Third-party open-source software glib | 三方开源软件glib",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "LGPL V2.1",
+    "repository": "https://gitee.com/openharmony/third_party_glib",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "third_party"
+    ],
+    "keywords": [
+        "third-party",
+        "glib"
+    ],
+    "envs": {},
+    "dirs": {},
+    "licensePath": "COPYING",
+    "segment": {
+        "destPath": "third_party/glib"
+    },
+    "component": {
+        "name": "thirdparty_glib",
+        "subsystem": "",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [],
+        "rom": "",
+        "ram": "",
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
