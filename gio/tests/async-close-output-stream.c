@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gstrfuncsprivate.h"
+
 #define DATA_TO_WRITE "Hello world\n"
 
 typedef struct
