@@ -951,7 +951,8 @@ handle_overwrite_open (const char    *filename,
                              G_IO_ERROR,
                              G_IO_ERROR_NOT_REGULAR_FILE,
                              _("Target file is not a regular file"));
-      goto error;
+          goto error;
+        }
     }
   
   if (etag != NULL)
