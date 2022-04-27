@@ -1,0 +1,626 @@
+# Copyright (c) Huawei Technologies Co., Ltd. 2021. All rights reserved.
+
+import("//build/ohos.gni")
+
+group("glib_packages") {
+  deps = [
+    ":ginotify",
+    ":gio",
+    ":glib",
+    ":gmodule",
+    ":gobject",
+    ":gxdgmime",
+  ]
+}
+
+config("glib_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "glib/libcharset",
+    "glib/pcre",
+    "glib",
+    "glib/deprecated",
+    "//third_party/gettext/gettext-runtime/intl",
+  ]
+  cflags = [
+    "-DG_LOG_DOMAIN=\"GLib\"",
+    "-DGLIB_CHARSETALIAS_DIR=\"system/lib64\"",
+    "-DHAVE_MEMMOVE",
+    "-DSUPPORT_UCP",
+    "-DSUPPORT_UTF",
+    "-DSUPPORT_UTF8",
+    "-DNEWLINE=-1",
+    "-DMATCH_LIMIT=10000000",
+    "-DMATCH_LIMIT_RECURSION=8192",
+    "-DMAX_NAME_SIZE=32",
+    "-DMAX_NAME_COUNT=10000",
+    "-DMAX_DUPLENGTH=30000",
+    "-DLINK_SIZE=2",
+    "-DPOSIX_MALLOC_THRESHOLD=10",
+    "-DPCRE_STATIC",
+    "-UBSR_ANYCRLF",
+    "-UEBCDIC",
+    "-DGLIB_COMPILATION",
+    "-Wno-sign-compare",
+    "-Wno-unused-value",
+    "-Wno-unused-function",
+    "-Wno-int-conversion",
+  ]
+}
+
+ohos_source_set("glib_source") {
+  sources = [
+    "glib/deprecated/gallocator.c",
+    "glib/deprecated/gcache.c",
+    "glib/deprecated/gcompletion.c",
+    "glib/deprecated/grel.c",
+    "glib/deprecated/gthread-deprecated.c",
+    "glib/garcbox.c",
+    "glib/garray.c",
+    "glib/gasyncqueue.c",
+    "glib/gatomic.c",
+    "glib/gbacktrace.c",
+    "glib/gbase64.c",
+    "glib/gbitlock.c",
+    "glib/gbookmarkfile.c",
+    "glib/gbytes.c",
+    "glib/gcharset.c",
+    "glib/gchecksum.c",
+    "glib/gconvert.c",
+    "glib/gdataset.c",
+    "glib/gdate.c",
+    "glib/gdatetime.c",
+    "glib/gdir.c",
+    "glib/genviron.c",
+    "glib/gerror.c",
+    "glib/gfileutils.c",
+    "glib/ggettext.c",
+    "glib/ghash.c",
+    "glib/ghmac.c",
+    "glib/ghook.c",
+    "glib/ghostutils.c",
+    "glib/giochannel.c",
+    "glib/giounix.c",
+    "glib/gkeyfile.c",
+    "glib/glib-init.c",
+    "glib/glib-private.c",
+    "glib/glib-unix.c",
+    "glib/glist.c",
+    "glib/gmain.c",
+    "glib/gmappedfile.c",
+    "glib/gmarkup.c",
+    "glib/gmem.c",
+    "glib/gmessages.c",
+    "glib/gnode.c",
+    "glib/goption.c",
+    "glib/gpattern.c",
+    "glib/gpoll.c",
+    "glib/gprimes.c",
+    "glib/gprintf.c",
+    "glib/gqsort.c",
+    "glib/gquark.c",
+    "glib/gqueue.c",
+    "glib/grand.c",
+    "glib/grcbox.c",
+    "glib/grefcount.c",
+    "glib/grefstring.c",
+    "glib/gregex.c",
+    "glib/gscanner.c",
+    "glib/gsequence.c",
+    "glib/gshell.c",
+    "glib/gslice.c",
+    "glib/gslist.c",
+    "glib/gspawn.c",
+    "glib/gstdio.c",
+    "glib/gstrfuncs.c",
+    "glib/gstring.c",
+    "glib/gstringchunk.c",
+    "glib/gtestutils.c",
+    "glib/gthread-posix.c",
+    "glib/gthread.c",
+    "glib/gthreadpool.c",
+    "glib/gtimer.c",
+    "glib/gtimezone.c",
+    "glib/gtrace.c",
+    "glib/gtranslit.c",
+    "glib/gtrashstack.c",
+    "glib/gtree.c",
+    "glib/gunibreak.c",
+    "glib/gunicollate.c",
+    "glib/gunidecomp.c",
+    "glib/guniprop.c",
+    "glib/guri.c",
+    "glib/gutf8.c",
+    "glib/gutils.c",
+    "glib/gutilsprivate.h",
+    "glib/guuid.c",
+    "glib/gvariant-core.c",
+    "glib/gvariant-parser.c",
+    "glib/gvariant-serialiser.c",
+    "glib/gvariant.c",
+    "glib/gvarianttype.c",
+    "glib/gvarianttypeinfo.c",
+    "glib/gversion.c",
+    "glib/gwakeup.c",
+    "glib/libcharset/localcharset.c",
+    "glib/pcre/pcre_byte_order.c",
+    "glib/pcre/pcre_chartables.c",
+    "glib/pcre/pcre_compile.c",
+    "glib/pcre/pcre_config.c",
+    "glib/pcre/pcre_dfa_exec.c",
+    "glib/pcre/pcre_exec.c",
+    "glib/pcre/pcre_fullinfo.c",
+    "glib/pcre/pcre_get.c",
+    "glib/pcre/pcre_globals.c",
+    "glib/pcre/pcre_jit_compile.c",
+    "glib/pcre/pcre_newline.c",
+    "glib/pcre/pcre_ord2utf8.c",
+    "glib/pcre/pcre_string_utils.c",
+    "glib/pcre/pcre_study.c",
+    "glib/pcre/pcre_tables.c",
+    "glib/pcre/pcre_valid_utf8.c",
+    "glib/pcre/pcre_version.c",
+    "glib/pcre/pcre_xclass.c",
+  ]
+
+  configs = [ ":glib_config" ]
+}
+ohos_shared_library("glib") {
+  deps = [
+    ":glib_source",
+    "//third_party/gettext:libintl",
+  ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
+config("gmodule_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "gmodule",
+    "glib",
+  ]
+  cflags = [ "-DG_LOG_DOMAIN=\"GModule\"" ]
+}
+
+ohos_source_set("gmodule_source") {
+  sources = [ "gmodule/gmodule.c" ]
+
+  configs = [ ":gmodule_config" ]
+}
+ohos_shared_library("gmodule") {
+  deps = [
+    ":glib",
+    ":gmodule_source",
+  ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
+config("gobject_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "gobject",
+    "glib",
+    "//third_party/libffi/include",
+    "//third_party/gettext/gettext-runtime/intl",
+  ]
+  cflags = [
+    "-DG_LOG_DOMAIN=\"GObject\"",
+    "-DGOBJECT_COMPILATION",
+    "-Wno-sign-compare",
+    "-Wno-unused-function",
+    "-Wno-int-conversion",
+  ]
+}
+
+ohos_source_set("gobject_source") {
+  sources = [
+    "gobject/gatomicarray.c",
+    "gobject/gbinding.c",
+    "gobject/gboxed.c",
+    "gobject/gclosure.c",
+    "gobject/genums.c",
+    "gobject/gmarshal.c",
+    "gobject/gobject.c",
+    "gobject/gparam.c",
+    "gobject/gparamspecs.c",
+    "gobject/gsignal.c",
+    "gobject/gsourceclosure.c",
+    "gobject/gtype.c",
+    "gobject/gtypemodule.c",
+    "gobject/gtypeplugin.c",
+    "gobject/gvalue.c",
+    "gobject/gvaluearray.c",
+    "gobject/gvaluetransform.c",
+    "gobject/gvaluetypes.c",
+  ]
+
+  configs = [ ":gobject_config" ]
+}
+
+ohos_shared_library("gobject") {
+  deps = [
+    ":glib",
+    ":gobject_source",
+    "//third_party/libffi:ffi",
+    "//third_party/gettext:libintl",
+  ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
+#############################################################################
+#############################################################################
+#############################################################################
+
+config("gio_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "gio",
+    "glib",
+    "gio/xdgmime",
+    "gio/inotify",
+    "gmodule",
+    "//third_party/gettext/gettext-runtime/intl",
+    "//third_party/zlib",
+  ]
+  cflags = [
+    "-DG_LOG_DOMAIN=\"GLib-GIO\"",
+    #"-DGOBJECT_COMPILATION",
+    "-Wno-sign-compare",
+    "-Wno-unused-function",
+    "-Wno-int-conversion",
+    "-DGIO_COMPILATION",
+    "-DGIO_MODULE_DIR=\"\"",
+    "-DLOCALSTATEDIR=\"var\"",
+    "-Wno-implicit-function-declaration",
+    "-Wno-format",
+    "-Wno-conditional-type-mismatch",
+    "-Wno-self-assign",
+    "-Wno-unused-value",
+    "-Wno-unused-function",
+    "-Wno-pointer-sign",
+    "-fvisibility=hidden",
+    "-DMAJOR_IN_SYSMACROS",
+    "-DG_ENABLE_DEBUG",
+  ]
+}
+
+ohos_source_set("gio_source") {
+  sources = [
+    # application_sources
+    "gio/gapplication.c",
+    "gio/gapplicationcommandline.c",
+    "gio/gapplicationimpl-dbus.c",
+    "gio/gactiongroup.c",
+    "gio/gactionmap.c",
+    "gio/gsimpleactiongroup.c",
+    "gio/gremoteactiongroup.c",
+    "gio/gactiongroupexporter.c",
+    "gio/gdbusactiongroup.c",
+    "gio/gaction.c",
+    "gio/gpropertyaction.c",
+    "gio/gsimpleaction.c",
+    "gio/gmenumodel.c",
+    "gio/gmenu.c",
+    "gio/gmenuexporter.c",
+    "gio/gdbusmenumodel.c",
+    "gio/gnotification.c",
+    "gio/gnotificationbackend.c",
+
+    # settings_sources
+    "gio/gvdb/gvdb-reader.c",
+    "gio/gdelayedsettingsbackend.c",
+    "gio/gkeyfilesettingsbackend.c",
+    "gio/gmemorysettingsbackend.c",
+    "gio/gnullsettingsbackend.c",
+    "gio/gsettingsbackend.c",
+    "gio/gsettingsschema.c",
+    "gio/gsettings-mapping.c",
+    "gio/gsettings.c",
+
+    # gdbus_sources
+    "gio/gdbusutils.c",
+    "gio/gdbusaddress.c",
+    "gio/gdbusauthobserver.c",
+    "gio/gdbusauth.c",
+    "gio/gdbusauthmechanism.c",
+    "gio/gdbusauthmechanismanon.c",
+    "gio/gdbusauthmechanismexternal.c",
+    "gio/gdbusauthmechanismsha1.c",
+    "gio/gdbuserror.c",
+    "gio/gdbusconnection.c",
+    "gio/gdbusmessage.c",
+    "gio/gdbusnameowning.c",
+    "gio/gdbusnamewatching.c",
+    "gio/gdbusproxy.c",
+    "gio/gdbusprivate.c",
+    "gio/gdbusintrospection.c",
+    "gio/gdbusmethodinvocation.c",
+    "gio/gdbusserver.c",
+    "gio/gdbusinterface.c",
+    "gio/gdbusinterfaceskeleton.c",
+    "gio/gdbusobject.c",
+    "gio/gdbusobjectskeleton.c",
+    "gio/gdbusobjectproxy.c",
+    "gio/gdbusobjectmanager.c",
+    "gio/gdbusobjectmanagerclient.c",
+    "gio/gdbusobjectmanagerserver.c",
+    "gio/gtestdbus.c",
+
+    # portal_sources
+    "gio/gdocumentportal.c",
+    "gio/gopenuriportal.c",
+    "gio/gmemorymonitorportal.c",
+    "gio/gnetworkmonitorportal.c",
+    "gio/gproxyresolverportal.c",
+    "gio/gtrashportal.c",
+    "gio/gportalsupport.c",
+    "gio/gportalnotificationbackend.c",
+
+    # local_sources
+    "gio/ghttpproxy.c",
+    "gio/glocalfile.c",
+    "gio/glocalfileenumerator.c",
+    "gio/glocalfileinfo.c",
+    "gio/glocalfileinputstream.c",
+    "gio/glocalfilemonitor.c",
+    "gio/glocalfileoutputstream.c",
+    "gio/glocalfileiostream.c",
+    "gio/glocalvfs.c",
+    "gio/gsocks4proxy.c",
+    "gio/gsocks4aproxy.c",
+    "gio/gsocks5proxy.c",
+    "gio/thumbnail-verify.c",
+
+    # unix_sources + HAVE_NETLINK
+    "gio/gnetworkmonitornetlink.c",
+    "gio/gnetworkmonitornm.c",
+
+    # unix_sources
+    "gio/gfiledescriptorbased.c",
+    "gio/giounix-private.c",
+    "gio/gunixconnection.c",
+    "gio/gunixcredentialsmessage.c",
+    "gio/gunixfdlist.c",
+    "gio/gunixfdmessage.c",
+    "gio/gunixmount.c",
+    "gio/gunixmounts.c",
+    "gio/gunixsocketaddress.c",
+    "gio/gunixvolume.c",
+    "gio/gunixvolumemonitor.c",
+    "gio/gunixinputstream.c",
+    "gio/gunixoutputstream.c",
+    "gio/gfdonotificationbackend.c",
+    "gio/ggtknotificationbackend.c",
+
+    # appinfo_sources
+    "gio/gdesktopappinfo.c",
+
+    # contenttype_sources
+    "gio/gcontenttype.c",
+
+    # gdbus_daemon_sources
+    "gio/gdbusdaemon.c",
+
+    # gio_sources
+    "gio/gappinfo.c",
+    "gio/gasynchelper.c",
+    "gio/gasyncinitable.c",
+    "gio/gasyncresult.c",
+    "gio/gbufferedinputstream.c",
+    "gio/gbufferedoutputstream.c",
+    "gio/gbytesicon.c",
+    "gio/gcancellable.c",
+    "gio/gcharsetconverter.c",
+    "gio/gcontextspecificgroup.c",
+    "gio/gconverter.c",
+    "gio/gconverterinputstream.c",
+    "gio/gconverteroutputstream.c",
+    "gio/gcredentials.c",
+    "gio/gdatagrambased.c",
+    "gio/gdatainputstream.c",
+    "gio/gdataoutputstream.c",
+    "gio/gdrive.c",
+    "gio/gdummyfile.c",
+    "gio/gdummyproxyresolver.c",
+    "gio/gdummytlsbackend.c",
+    "gio/gemblem.c",
+    "gio/gemblemedicon.c",
+    "gio/gfile.c",
+    "gio/gfileattribute.c",
+    "gio/gfileenumerator.c",
+    "gio/gfileicon.c",
+    "gio/gfileinfo.c",
+    "gio/gfileinputstream.c",
+    "gio/gfilemonitor.c",
+    "gio/gfilenamecompleter.c",
+    "gio/gfileoutputstream.c",
+    "gio/gfileiostream.c",
+    "gio/gfilterinputstream.c",
+    "gio/gfilteroutputstream.c",
+    "gio/gicon.c",
+    "gio/ginetaddress.c",
+    "gio/ginetaddressmask.c",
+    "gio/ginetsocketaddress.c",
+    "gio/ginitable.c",
+    "gio/ginputstream.c",
+    "gio/gioerror.c",
+    "gio/giomodule.c",
+    "gio/giomodule-priv.c",
+    "gio/gioscheduler.c",
+    "gio/giostream.c",
+    "gio/gloadableicon.c",
+    "gio/gmarshal-internal.c",
+    "gio/gmount.c",
+    "gio/gmemorymonitor.c",
+    "gio/gmemorymonitordbus.c",
+    "gio/gmemoryinputstream.c",
+    "gio/gmemoryoutputstream.c",
+    "gio/gmountoperation.c",
+    "gio/gnativesocketaddress.c",
+    "gio/gnativevolumemonitor.c",
+    "gio/gnetworkaddress.c",
+    "gio/gnetworking.c",
+    "gio/gnetworkmonitor.c",
+    "gio/gnetworkmonitorbase.c",
+    "gio/gnetworkservice.c",
+    "gio/goutputstream.c",
+    "gio/gpermission.c",
+    "gio/gpollableinputstream.c",
+    "gio/gpollableoutputstream.c",
+    "gio/gpollableutils.c",
+    "gio/gpollfilemonitor.c",
+    "gio/gproxy.c",
+    "gio/gproxyaddress.c",
+    "gio/gproxyaddressenumerator.c",
+    "gio/gproxyresolver.c",
+    "gio/gresolver.c",
+    "gio/gresource.c",
+    "gio/gresourcefile.c",
+    "gio/gseekable.c",
+    "gio/gsimpleasyncresult.c",
+    "gio/gsimpleiostream.c",
+    "gio/gsimplepermission.c",
+    "gio/gsimpleproxyresolver.c",
+    "gio/gsocket.c",
+    "gio/gsocketaddress.c",
+    "gio/gsocketaddressenumerator.c",
+    "gio/gsocketclient.c",
+    "gio/gsocketconnectable.c",
+    "gio/gsocketconnection.c",
+    "gio/gsocketcontrolmessage.c",
+    "gio/gsocketinputstream.c",
+    "gio/gsocketlistener.c",
+    "gio/gsocketoutputstream.c",
+    "gio/gsocketservice.c",
+    "gio/gsrvtarget.c",
+    "gio/gsubprocesslauncher.c",
+    "gio/gsubprocess.c",
+    "gio/gtask.c",
+    "gio/gtcpconnection.c",
+    "gio/gtcpwrapperconnection.c",
+    "gio/gthemedicon.c",
+    "gio/gthreadedsocketservice.c",
+    "gio/gthreadedresolver.c",
+    "gio/gthreadedresolver.h",
+    "gio/gtlsbackend.c",
+    "gio/gtlscertificate.c",
+    "gio/gtlsclientconnection.c",
+    "gio/gtlsconnection.c",
+    "gio/gtlsdatabase.c",
+    "gio/gtlsfiledatabase.c",
+    "gio/gtlsinteraction.c",
+    "gio/gtlspassword.c",
+    "gio/gtlsserverconnection.c",
+    "gio/gdtlsconnection.c",
+    "gio/gdtlsclientconnection.c",
+    "gio/gdtlsserverconnection.c",
+    "gio/gunionvolumemonitor.c",
+    "gio/gvfs.c",
+    "gio/gvolume.c",
+    "gio/gvolumemonitor.c",
+    "gio/gzlibcompressor.c",
+    "gio/gzlibdecompressor.c",
+    "gio/glistmodel.c",
+    "gio/gliststore.c",
+
+    # out
+    "gio/gioenumtypes.c",
+    "gio/xdp-dbus.c",
+    "gio/gdbus-daemon-generated.c",
+  ]
+
+  configs = [ ":gio_config" ]
+}
+
+ohos_shared_library("gio") {
+  deps = [
+    ":ginotify",
+    ":gio_source",
+    ":glib",
+    ":gmodule",
+    ":gobject",
+    ":gxdgmime",
+    "//third_party/gettext:libintl",
+    "//third_party/zlib:libz",
+  ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
+config("gxdgmime_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "gmodule",
+    "glib",
+  ]
+  cflags = [
+    "-DXDG_PREFIX=_gio_xdg",
+    "-fvisibility=hidden",
+    "-Wno-shift-negative-value",
+    "-Wno-sign-compare",
+  ]
+}
+
+ohos_source_set("gxdgmime_source") {
+  sources = [
+    "gio/xdgmime/xdgmime.c",
+    "gio/xdgmime/xdgmimealias.c",
+    "gio/xdgmime/xdgmimecache.c",
+    "gio/xdgmime/xdgmimeglob.c",
+    "gio/xdgmime/xdgmimeicon.c",
+    "gio/xdgmime/xdgmimeint.c",
+    "gio/xdgmime/xdgmimemagic.c",
+    "gio/xdgmime/xdgmimeparent.c",
+  ]
+
+  configs = [ ":gxdgmime_config" ]
+}
+
+ohos_static_library("gxdgmime") {
+  deps = [ ":gxdgmime_source" ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
+config("ginotify_config") {
+  visibility = [ ":*" ]
+  include_dirs = [
+    ".",
+    "gmodule",
+    "glib",
+  ]
+  cflags = [
+    "-DXDG_PREFIX=_gio_xdg",
+    "-fvisibility=hidden",
+    "-Wno-shift-negative-value",
+    "-Wno-sign-compare",
+    "-DGIO_COMPILATION",
+  ]
+}
+
+ohos_source_set("ginotify_source") {
+  sources = [
+    "gio/inotify/ginotifyfilemonitor.c",
+    "gio/inotify/inotify-helper.c",
+    "gio/inotify/inotify-kernel.c",
+    "gio/inotify/inotify-missing.c",
+    "gio/inotify/inotify-path.c",
+    "gio/inotify/inotify-sub.c",
+  ]
+
+  configs = [ ":ginotify_config" ]
+}
+
+ohos_static_library("ginotify") {
+  deps = [ ":ginotify_source" ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
