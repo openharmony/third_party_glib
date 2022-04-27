@@ -72,8 +72,13 @@
 #include <sys/syscall.h>
 #endif
 
+/* ohos.ext.func.0027: glib 2.62.5 update 2.68.1 Incompatible with gstreamer 1.16.2
+ * static volatile gsize _init_once = 0; // Conflicts with volatile, 
+ *    if (g_once_init_enter (&_init_once))
+ *    add "&& !defined(__clang__)"
+ */
 #if defined(HAVE_FUTEX) && \
-    (defined(HAVE_STDATOMIC_H) || defined(__ATOMIC_SEQ_CST))
+    (defined(HAVE_STDATOMIC_H) || defined(__ATOMIC_SEQ_CST)) && !defined(__clang__)
 #define USE_NATIVE_MUTEX
 #endif
 
