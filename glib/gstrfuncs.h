@@ -253,7 +253,15 @@ GLIB_AVAILABLE_IN_ALL
 gchar*                g_strescape      (const gchar *source,
 					const gchar *exceptions) G_GNUC_MALLOC;
 
+
+/* ohos.glib.compatible.001: glib 2.62.5 update 2.68.1 Incompatible with gstreamer/libsoup
+ * GLIB Not allowed g_memdup but gstreamer/libsoup need to use g_memdup
+ */
+#ifdef OHOS_GLIB_COMPATIBLE
+GLIB_AVAILABLE_IN_ALL
+#else
 GLIB_DEPRECATED_IN_2_68_FOR (g_memdup2)
+#endif
 gpointer              g_memdup         (gconstpointer mem,
                                         guint         byte_size) G_GNUC_ALLOC_SIZE(2);
 

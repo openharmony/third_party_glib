@@ -329,8 +329,6 @@
 
 #define HAVE_UNSETENV 1
 
-#define HAVE_USELOCALE 1
-
 #define HAVE_UTIMES 1
 
 #define HAVE_VALLOC 1
