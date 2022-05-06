@@ -1344,6 +1344,7 @@ sha512_sum_close (Sha512sum *sha512)
   memset (pad + pad_len, 0x00, zeros / 8);
   pad_len += zeros / 8;
   zeros = zeros % 8;
+  (void) zeros;  /* don’t care about the dead store */
 
   /* put message bit length at the end of padding */
   PUT_UINT64 (sha512->data_len[1], pad, pad_len);
@@ -1460,7 +1461,7 @@ g_checksum_type_get_length (GChecksumType checksum_type)
  * will be closed and it won't be possible to call g_checksum_update()
  * on it anymore.
  *
- * Returns: (transfer full): the newly created #GChecksum, or %NULL.
+ * Returns: (transfer full) (nullable): the newly created #GChecksum, or %NULL.
  *   Use g_checksum_free() to free the memory allocated by it.
  *
  * Since: 2.16
@@ -1528,8 +1529,8 @@ g_checksum_reset (GChecksum *checksum)
  * g_checksum_get_string() or g_checksum_get_digest(), the copied
  * checksum will be closed as well.
  *
- * Returns: the copy of the passed #GChecksum. Use g_checksum_free()
- *   when finished using it.
+ * Returns: (transfer full): the copy of the passed #GChecksum. Use
+ *   g_checksum_free() when finished using it.
  *
  * Since: 2.16
  */
@@ -1774,8 +1775,10 @@ g_checksum_get_digest (GChecksum  *checksum,
  *
  * The hexadecimal string returned will be in lower case.
  *
- * Returns: the digest of the binary data as a string in hexadecimal.
- *   The returned string should be freed with g_free() when done using it.
+ * Returns: (transfer full) (nullable): the digest of the binary data as a
+ *   string in hexadecimal, or %NULL if g_checksum_new() fails for
+ *   @checksum_type. The returned string should be freed with g_free() when
+ *   done using it.
  *
  * Since: 2.16
  */
@@ -1787,7 +1790,6 @@ g_compute_checksum_for_data (GChecksumType  checksum_type,
   GChecksum *checksum;
   gchar *retval;
 
-  g_return_val_if_fail (IS_VALID_TYPE (checksum_type), NULL);
   g_return_val_if_fail (length == 0 || data != NULL, NULL);
 
   checksum = g_checksum_new (checksum_type);
@@ -1811,7 +1813,8 @@ g_compute_checksum_for_data (GChecksumType  checksum_type,
  *
  * The hexadecimal string returned will be in lower case.
  *
- * Returns: the checksum as a hexadecimal string. The returned string
+ * Returns: (transfer full) (nullable): the checksum as a hexadecimal string,
+ *   or %NULL if g_checksum_new() fails for @checksum_type. The returned string
  *   should be freed with g_free() when done using it.
  *
  * Since: 2.16
@@ -1821,7 +1824,6 @@ g_compute_checksum_for_string (GChecksumType  checksum_type,
                                const gchar   *str,
                                gssize         length)
 {
-  g_return_val_if_fail (IS_VALID_TYPE (checksum_type), NULL);
   g_return_val_if_fail (length == 0 || str != NULL, NULL);
 
   if (length < 0)
@@ -1841,8 +1843,10 @@ g_compute_checksum_for_string (GChecksumType  checksum_type,
  *
  * The hexadecimal string returned will be in lower case.
  *
- * Returns: the digest of the binary data as a string in hexadecimal.
- *   The returned string should be freed with g_free() when done using it.
+ * Returns: (transfer full) (nullable): the digest of the binary data as a
+ *   string in hexadecimal, or %NULL if g_checksum_new() fails for
+ *   @checksum_type. The returned string should be freed with g_free() when
+ *   done using it.
  *
  * Since: 2.34
  */
@@ -1853,7 +1857,6 @@ g_compute_checksum_for_bytes (GChecksumType  checksum_type,
   gconstpointer byte_data;
   gsize length;
 
-  g_return_val_if_fail (IS_VALID_TYPE (checksum_type), NULL);
   g_return_val_if_fail (data != NULL, NULL);
 
   byte_data = g_bytes_get_data (data, &length);

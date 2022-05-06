@@ -19,7 +19,9 @@
  * if advised of the possibility of such damage.
  */
 
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #define _XOPEN_SOURCE 600
 #include <ctype.h>
@@ -203,6 +205,8 @@ test_is_to_digit (void)
 static void
 test_memdup (void)
 {
+  G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+
   gchar *str_dup = NULL;
   const gchar *str = "The quick brown fox jumps over the lazy dog";
 
@@ -217,6 +221,8 @@ test_memdup (void)
   g_assert_cmpstr (str, ==, str_dup);
 
   g_free (str_dup);
+
+  G_GNUC_END_IGNORE_DEPRECATIONS
 }
 
 /* Testing g_memdup2() function with various positive and negative cases */
@@ -543,9 +549,7 @@ test_strdupv (void)
 
   copy = g_strdupv (vec);
   g_assert_nonnull (copy);
-  g_assert_cmpstr (copy[0], ==, "Foo");
-  g_assert_cmpstr (copy[1], ==, "Bar");
-  g_assert_null (copy[2]);
+  g_assert_cmpstrv (copy, vec);
   g_strfreev (copy);
 }
 
@@ -751,6 +755,22 @@ test_strcompress_strescape (void)
   g_assert_cmpstr (str, ==, "abc\\\"\b\f\n\r\t\v\003\177\234\313");
   g_free (str);
   g_free (tmp);
+
+  /* Unicode round trip */
+  str = g_strescape ("héllø there⸘", NULL);
+  g_assert_nonnull (str);
+  g_assert_cmpstr (str, ==, "h\\303\\251ll\\303\\270 there\\342\\270\\230");
+  tmp = g_strcompress (str);
+  g_assert_nonnull (tmp);
+  g_assert_cmpstr (tmp, ==, "héllø there⸘");
+  g_free (tmp);
+  g_free (str);
+
+  /* Test expanding invalid escapes */
+  str = g_strcompress ("\\11/ \\118 \\8aa \\19");
+  g_assert_nonnull (str);
+  g_assert_cmpstr (str, ==, "\t/ \t8 8aa \0019");
+  g_free (str);
 }
 
 /* Testing g_ascii_strcasecmp() and g_ascii_strncasecmp() */

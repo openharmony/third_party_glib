@@ -221,7 +221,7 @@ test_internal_enhanced_stdio (void)
   guint64 size_p0, alsize_p0, size_ps, alsize_ps;
   const gchar *id_p0;
   const gchar *id_p1;
-  volatile guint64 time_p0;
+  guint64 time_p0;
   gchar *tmp_dir;
   wchar_t *programdata_dir_w;
   wchar_t *users_dir_w;
@@ -229,6 +229,13 @@ test_internal_enhanced_stdio (void)
     { 0x62AB5D82, 0xFDC1, 0x4DC3, { 0xA9, 0xDD, 0x07, 0x0D, 0x1D, 0x49, 0x5D, 0x97 } };
   static const GUID folder_id_users = 
     { 0x0762D272, 0xC50A, 0x4BB0, { 0xA3, 0x82, 0x69, 0x7D, 0xCD, 0x72, 0x9B, 0x80 } };
+  GDateTime *dt = NULL, *dt2 = NULL;
+  GTimeSpan ts;
+  /* Just before SYSTEMTIME limit (Jan 1 30827) */
+  const gint64 one_sec_before_systemtime_limit = 910670515199;
+  gboolean retval;
+  GError *local_error = NULL;
+
 
   programdata_dir_w = NULL;
   SHGetKnownFolderPath (&folder_id_programdata, 0, NULL, &programdata_dir_w);
@@ -552,7 +559,8 @@ test_internal_enhanced_stdio (void)
                              G_FILE_ATTRIBUTE_STANDARD_SIZE ","
                              G_FILE_ATTRIBUTE_STANDARD_ALLOCATED_SIZE ","
                              G_FILE_ATTRIBUTE_ID_FILE ","
-                             G_FILE_ATTRIBUTE_TIME_MODIFIED,
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED ","
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC,
                              G_FILE_QUERY_INFO_NONE,
                              NULL, NULL);
 
@@ -560,7 +568,8 @@ test_internal_enhanced_stdio (void)
                              G_FILE_ATTRIBUTE_STANDARD_SIZE ","
                              G_FILE_ATTRIBUTE_STANDARD_ALLOCATED_SIZE ","
                              G_FILE_ATTRIBUTE_ID_FILE ","
-                             G_FILE_ATTRIBUTE_TIME_MODIFIED,
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED ","
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC,
                              G_FILE_QUERY_INFO_NONE,
                              NULL, NULL);
 
@@ -568,11 +577,13 @@ test_internal_enhanced_stdio (void)
   g_assert_true (g_file_info_has_attribute (fi_p0, G_FILE_ATTRIBUTE_STANDARD_ALLOCATED_SIZE));
   g_assert_true (g_file_info_has_attribute (fi_p0, G_FILE_ATTRIBUTE_ID_FILE));
   g_assert_true (g_file_info_has_attribute (fi_p0, G_FILE_ATTRIBUTE_TIME_MODIFIED));
+  g_assert_true (g_file_info_has_attribute (fi_p0, G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC));
 
   g_assert_true (g_file_info_has_attribute (fi_p1, G_FILE_ATTRIBUTE_STANDARD_SIZE));
   g_assert_true (g_file_info_has_attribute (fi_p1, G_FILE_ATTRIBUTE_STANDARD_ALLOCATED_SIZE));
   g_assert_true (g_file_info_has_attribute (fi_p1, G_FILE_ATTRIBUTE_ID_FILE));
   g_assert_true (g_file_info_has_attribute (fi_p1, G_FILE_ATTRIBUTE_TIME_MODIFIED));
+  g_assert_true (g_file_info_has_attribute (fi_p1, G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC));
 
   size_p0 = g_file_info_get_attribute_uint64 (fi_p0, G_FILE_ATTRIBUTE_STANDARD_SIZE);
   alsize_p0 = g_file_info_get_attribute_uint64 (fi_p0, G_FILE_ATTRIBUTE_STANDARD_ALLOCATED_SIZE);
@@ -604,6 +615,56 @@ test_internal_enhanced_stdio (void)
    */
   g_assert_cmpuint (time_p0, >, G_GUINT64_CONSTANT (0xFFFFFFFF));
 
+  dt = g_file_info_get_modification_date_time (fi_p0);
+  g_assert_nonnull (dt);
+  dt2 = g_date_time_add (dt, G_USEC_PER_SEC / 100 * 200);
+  g_object_unref (fi_p0);
+  fi_p0 = g_file_info_new ();
+  g_file_info_set_modification_date_time (fi_p0, dt2);
+
+  g_assert_true (g_file_set_attributes_from_info (gf_p0,
+                                                  fi_p0,
+                                                  G_FILE_QUERY_INFO_NONE,
+                                                  NULL,
+                                                  NULL));
+  g_date_time_unref (dt2);
+  g_object_unref (fi_p0);
+  fi_p0 = g_file_query_info (gf_p0,
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED ","
+                             G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC,
+                             G_FILE_QUERY_INFO_NONE,
+                             NULL, NULL);
+  dt2 = g_file_info_get_modification_date_time (fi_p0);
+  ts = g_date_time_difference (dt2, dt);
+  g_assert_cmpint (ts, >, 0);
+  g_assert_cmpint (ts, <, G_USEC_PER_SEC / 100 * 300);
+
+  g_date_time_unref (dt);
+  g_date_time_unref (dt2);
+
+  g_file_info_set_attribute_uint64 (fi_p0,
+                                    G_FILE_ATTRIBUTE_TIME_MODIFIED,
+                                    one_sec_before_systemtime_limit);
+  g_file_info_set_attribute_uint32 (fi_p0, G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC, 0);
+  g_assert_true (g_file_set_attributes_from_info (gf_p0,
+                                                  fi_p0,
+                                                  G_FILE_QUERY_INFO_NONE,
+                                                  NULL,
+                                                  NULL));
+
+  g_file_info_set_attribute_uint64 (fi_p0,
+                                   G_FILE_ATTRIBUTE_TIME_MODIFIED,
+                                   one_sec_before_systemtime_limit + G_USEC_PER_SEC * 2);
+  g_file_info_set_attribute_uint32 (fi_p0, G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC, 0);
+  retval = g_file_set_attributes_from_info (gf_p0,
+                                            fi_p0,
+                                            G_FILE_QUERY_INFO_NONE,
+                                            NULL,
+                                            &local_error);
+  g_assert_error (local_error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
+  g_assert_false (retval);
+  g_clear_error (&local_error);
+
   g_object_unref (fi_p0);
   g_object_unref (fi_p1);
   g_object_unref (gf_p0);
@@ -616,6 +677,66 @@ test_internal_enhanced_stdio (void)
 }
 #endif
 
+static void
+test_xattrs (void)
+{
+  GFile *file = NULL;
+  GFileIOStream *stream = NULL;
+  GFileInfo *file_info0 = NULL, *file_info1 = NULL;
+  GError *local_error = NULL;
+
+  g_test_summary ("Test setting and getting escaped xattrs");
+
+  /* Create a temporary file; no need to write anything to it. */
+  file = g_file_new_tmp ("g-file-info-test-xattrs-XXXXXX", &stream, &local_error);
+  g_assert_no_error (local_error);
+  g_assert_nonnull (file);
+
+  g_io_stream_close (G_IO_STREAM (stream), NULL, NULL);
+  g_object_unref (stream);
+
+  /* Check the existing xattrs. */
+  file_info0 = g_file_query_info (file, "xattr::*", G_FILE_QUERY_INFO_NONE, NULL, &local_error);
+  g_assert_no_error (local_error);
+  g_assert_nonnull (file_info0);
+
+  /* Set some new xattrs, with escaping and some embedded nuls. */
+  g_file_info_set_attribute_string (file_info0, "xattr::escaped", "hello\\x82\\x80\\xbd");
+  g_file_info_set_attribute_string (file_info0, "xattr::string", "hi there");
+  g_file_info_set_attribute_string (file_info0, "xattr::embedded-nul", "hi\\x00there");
+
+  g_file_set_attributes_from_info (file, file_info0, G_FILE_QUERY_INFO_NONE, NULL, &local_error);
+
+  g_object_unref (file_info0);
+
+  if (g_error_matches (local_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
+    {
+      g_test_skip ("xattrs not supported on this file system");
+      g_clear_error (&local_error);
+    }
+  else
+    {
+      g_assert_no_error (local_error);
+
+      /* Check they were set properly. */
+      file_info1 = g_file_query_info (file, "xattr::*", G_FILE_QUERY_INFO_NONE, NULL, &local_error);
+      g_assert_no_error (local_error);
+      g_assert_nonnull (file_info1);
+
+      g_assert_true (g_file_info_has_namespace (file_info1, "xattr"));
+
+      g_assert_cmpstr (g_file_info_get_attribute_string (file_info1, "xattr::escaped"), ==, "hello\\x82\\x80\\xbd");
+      g_assert_cmpstr (g_file_info_get_attribute_string (file_info1, "xattr::string"), ==, "hi there");
+      g_assert_cmpstr (g_file_info_get_attribute_string (file_info1, "xattr::embedded-nul"), ==, "hi\\x00there");
+
+      g_object_unref (file_info1);
+    }
+
+  /* Tidy up. */
+  g_file_delete (file, NULL, NULL);
+
+  g_object_unref (file);
+}
 
 int
 main (int   argc,
@@ -628,6 +749,7 @@ main (int   argc,
 #ifdef G_OS_WIN32
   g_test_add_func ("/g-file-info/internal-enhanced-stdio", test_internal_enhanced_stdio);
 #endif
+  g_test_add_func ("/g-file-info/xattrs", test_xattrs);
   
   return g_test_run();
 }

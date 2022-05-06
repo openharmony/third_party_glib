@@ -15,10 +15,6 @@ elif host_system == 'aix'
   g_module_impl = 'G_MODULE_IMPL_AR'
 elif have_dlopen_dlsym
   g_module_impl = 'G_MODULE_IMPL_DL'
-# NSLinkModule (dyld) in system libraries (Darwin)
-elif cc.has_function('NSLinkModule')
-  g_module_impl = 'G_MODULE_IMPL_DYLD'
-  g_module_need_uscore = 1
 endif
 
 # additional checks for G_MODULE_IMPL_DL
@@ -124,3 +120,9 @@ pkg.generate(libraries : [libgmodule, export_dynamic_ldflags],
 libgmodule_dep = declare_dependency(link_with : libgmodule,
   include_directories : [gmoduleinc],
   dependencies : [libglib_dep])
+
+if meson.version().version_compare('>=0.54.0')
+  meson.override_dependency('gmodule-no-export-2.0', libgmodule_dep)
+  meson.override_dependency('gmodule-export-2.0', libgmodule_dep)
+  meson.override_dependency('gmodule-2.0', libgmodule_dep)
+endif

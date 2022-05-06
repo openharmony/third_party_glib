@@ -105,20 +105,24 @@ compute_checksum (guint8        *digest,
   g_assert (len == 32);
 }
 
-static void
-g_keyfile_settings_backend_keyfile_write (GKeyfileSettingsBackend *kfsb)
+static gboolean
+g_keyfile_settings_backend_keyfile_write (GKeyfileSettingsBackend  *kfsb,
+                                          GError                  **error)
 {
   gchar *contents;
   gsize length;
+  gboolean success;
 
   contents = g_key_file_to_data (kfsb->keyfile, &length, NULL);
-  g_file_replace_contents (kfsb->file, contents, length, NULL, FALSE,
-                           G_FILE_CREATE_REPLACE_DESTINATION |
-                           G_FILE_CREATE_PRIVATE,
-                           NULL, NULL, NULL);
+  success = g_file_replace_contents (kfsb->file, contents, length, NULL, FALSE,
+                                     G_FILE_CREATE_REPLACE_DESTINATION |
+                                     G_FILE_CREATE_PRIVATE,
+                                     NULL, NULL, error);
 
   compute_checksum (kfsb->digest, contents, length);
   g_free (contents);
+
+  return success;
 }
 
 static gboolean
@@ -157,6 +161,13 @@ convert_path (GKeyfileSettingsBackend  *kfsb,
 
   last_slash = strrchr (key, '/');
 
+  /* Disallow empty group names or key names */
+  if (key_len == 0 ||
+      (last_slash != NULL &&
+       (*(last_slash + 1) == '\0' ||
+        last_slash == key)))
+    return FALSE;
+
   if (kfsb->root_group)
     {
       /* if a root_group was specified, make sure the user hasn't given
@@ -184,7 +195,12 @@ convert_path (GKeyfileSettingsBackend  *kfsb,
     }
 
   if (basename)
-    *basename = g_memdup2 (last_slash + 1, key_len - (last_slash - key));
+    {
+      if (last_slash != NULL)
+        *basename = g_memdup2 (last_slash + 1, key_len - (last_slash - key));
+      else
+        *basename = g_strdup (key);
+    }
 
   return TRUE;
 }
@@ -356,7 +372,9 @@ g_keyfile_settings_backend_write_tree (GSettingsBackend *backend,
                                        GTree            *tree,
                                        gpointer          origin_tag)
 {
-  WriteManyData data = { G_KEYFILE_SETTINGS_BACKEND (backend) };
+  WriteManyData data = { G_KEYFILE_SETTINGS_BACKEND (backend), 0 };
+  gboolean success;
+  GError *error = NULL;
 
   if (!data.kfsb->writable)
     return FALSE;
@@ -367,11 +385,16 @@ g_keyfile_settings_backend_write_tree (GSettingsBackend *backend,
     return FALSE;
 
   g_tree_foreach (tree, g_keyfile_settings_backend_write_one, &data);
-  g_keyfile_settings_backend_keyfile_write (data.kfsb);
+  success = g_keyfile_settings_backend_keyfile_write (data.kfsb, &error);
+  if (error)
+    {
+      g_warning ("Failed to write keyfile to %s: %s", g_file_peek_path (data.kfsb->file), error->message);
+      g_error_free (error);
+    }
 
   g_settings_backend_changed_tree (backend, tree, origin_tag);
 
-  return TRUE;
+  return success;
 }
 
 static gboolean
@@ -382,6 +405,7 @@ g_keyfile_settings_backend_write (GSettingsBackend *backend,
 {
   GKeyfileSettingsBackend *kfsb = G_KEYFILE_SETTINGS_BACKEND (backend);
   gboolean success;
+  GError *error = NULL;
 
   if (!kfsb->writable)
     return FALSE;
@@ -391,7 +415,12 @@ g_keyfile_settings_backend_write (GSettingsBackend *backend,
   if (success)
     {
       g_settings_backend_changed (backend, key, origin_tag);
-      g_keyfile_settings_backend_keyfile_write (kfsb);
+      success = g_keyfile_settings_backend_keyfile_write (kfsb, &error);
+      if (error)
+        {
+          g_warning ("Failed to write keyfile to %s: %s", g_file_peek_path (kfsb->file), error->message);
+          g_error_free (error);
+        }
     }
 
   return success;
@@ -403,9 +432,17 @@ g_keyfile_settings_backend_reset (GSettingsBackend *backend,
                                   gpointer          origin_tag)
 {
   GKeyfileSettingsBackend *kfsb = G_KEYFILE_SETTINGS_BACKEND (backend);
+  GError *error = NULL;
 
   if (set_to_keyfile (kfsb, key, NULL))
-    g_keyfile_settings_backend_keyfile_write (kfsb);
+    {
+      g_keyfile_settings_backend_keyfile_write (kfsb, &error);
+      if (error)
+        {
+          g_warning ("Failed to write keyfile to %s: %s", g_file_peek_path (kfsb->file), error->message);
+          g_error_free (error);
+        }
+    }
 
   g_settings_backend_changed (backend, key, origin_tag);
 }
@@ -568,19 +605,24 @@ g_keyfile_settings_backend_finalize (GObject *object)
   g_hash_table_unref (kfsb->system_locks);
   g_free (kfsb->defaults_dir);
 
-  g_file_monitor_cancel (kfsb->file_monitor);
-  g_object_unref (kfsb->file_monitor);
+  if (kfsb->file_monitor)
+    {
+      g_file_monitor_cancel (kfsb->file_monitor);
+      g_object_unref (kfsb->file_monitor);
+    }
   g_object_unref (kfsb->file);
 
-  g_file_monitor_cancel (kfsb->dir_monitor);
-  g_object_unref (kfsb->dir_monitor);
+  if (kfsb->dir_monitor)
+    {
+      g_file_monitor_cancel (kfsb->dir_monitor);
+      g_object_unref (kfsb->dir_monitor);
+    }
   g_object_unref (kfsb->dir);
 
   g_free (kfsb->root_group);
   g_free (kfsb->prefix);
 
-  G_OBJECT_CLASS (g_keyfile_settings_backend_parent_class)
-    ->finalize (object);
+  G_OBJECT_CLASS (g_keyfile_settings_backend_parent_class)->finalize (object);
 }
 
 static void
@@ -687,6 +729,8 @@ static void
 g_keyfile_settings_backend_constructed (GObject *object)
 {
   GKeyfileSettingsBackend *kfsb = G_KEYFILE_SETTINGS_BACKEND (object);
+  GError *error = NULL;
+  const char *path;
 
   if (kfsb->file == NULL)
     {
@@ -707,17 +751,35 @@ g_keyfile_settings_backend_constructed (GObject *object)
   kfsb->permission = g_simple_permission_new (TRUE);
 
   kfsb->dir = g_file_get_parent (kfsb->file);
-  g_mkdir_with_parents (g_file_peek_path (kfsb->dir), 0700);
+  path = g_file_peek_path (kfsb->dir);
+  if (g_mkdir_with_parents (path, 0700) == -1)
+    g_warning ("Failed to create %s: %s", path, g_strerror (errno));
 
-  kfsb->file_monitor = g_file_monitor (kfsb->file, G_FILE_MONITOR_NONE, NULL, NULL);
-  kfsb->dir_monitor = g_file_monitor (kfsb->dir, G_FILE_MONITOR_NONE, NULL, NULL);
+  kfsb->file_monitor = g_file_monitor (kfsb->file, G_FILE_MONITOR_NONE, NULL, &error);
+  if (!kfsb->file_monitor)
+    {
+      g_warning ("Failed to create file monitor for %s: %s", g_file_peek_path (kfsb->file), error->message);
+      g_clear_error (&error);
+    }
+  else
+    {
+      g_signal_connect (kfsb->file_monitor, "changed",
+                        G_CALLBACK (file_changed), kfsb);
+    }
+
+  kfsb->dir_monitor = g_file_monitor (kfsb->dir, G_FILE_MONITOR_NONE, NULL, &error);
+  if (!kfsb->dir_monitor)
+    {
+      g_warning ("Failed to create file monitor for %s: %s", g_file_peek_path (kfsb->file), error->message);
+      g_clear_error (&error);
+    }
+  else
+    {
+      g_signal_connect (kfsb->dir_monitor, "changed",
+                        G_CALLBACK (dir_changed), kfsb);
+    }
 
   compute_checksum (kfsb->digest, NULL, 0);
-
-  g_signal_connect (kfsb->file_monitor, "changed",
-                    G_CALLBACK (file_changed), kfsb);
-  g_signal_connect (kfsb->dir_monitor, "changed",
-                    G_CALLBACK (dir_changed), kfsb);
 
   g_keyfile_settings_backend_keyfile_writable (kfsb);
   g_keyfile_settings_backend_keyfile_reload (kfsb);

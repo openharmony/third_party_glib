@@ -48,8 +48,8 @@
  * For a tutorial on implementing a new GObject class, see [How to define and
  * implement a new GObject][howto-gobject]. For a list of naming conventions for
  * GObjects and their methods, see the [GType conventions][gtype-conventions].
- * For the high-level concepts behind GObject, read [Instantiable classed types:
- * Objects][gtype-instantiable-classed].
+ * For the high-level concepts behind GObject, read [Instantiatable classed types:
+ * Objects][gtype-instantiatable-classed].
  *
  * ## Floating references # {#floating-ref}
  *
@@ -161,6 +161,29 @@ enum {
 enum {
   PROP_NONE
 };
+
+#define OPTIONAL_FLAG_IN_CONSTRUCTION 1<<0
+#define OPTIONAL_FLAG_HAS_SIGNAL_HANDLER 1<<1 /* Set if object ever had a signal handler */
+
+#if SIZEOF_INT == 4 && GLIB_SIZEOF_VOID_P == 8
+#define HAVE_OPTIONAL_FLAGS
+#endif
+
+typedef struct
+{
+  GTypeInstance  g_type_instance;
+
+  /*< private >*/
+  guint          ref_count;  /* (atomic) */
+#ifdef HAVE_OPTIONAL_FLAGS
+  guint          optional_flags;  /* (atomic) */
+#endif
+  GData         *qdata;
+} GObjectReal;
+
+G_STATIC_ASSERT(sizeof(GObject) == sizeof(GObjectReal));
+G_STATIC_ASSERT(G_STRUCT_OFFSET(GObject, ref_count) == G_STRUCT_OFFSET(GObjectReal, ref_count));
+G_STATIC_ASSERT(G_STRUCT_OFFSET(GObject, qdata) == G_STRUCT_OFFSET(GObjectReal, qdata));
 
 
 /* --- prototypes --- */
@@ -597,7 +620,7 @@ validate_and_install_class_property (GObjectClass *class,
         class->construct_properties = g_slist_append (class->construct_properties, pspec);
 
       /* for property overrides of construct properties, we have to get rid
-       * of the overidden inherited construct property
+       * of the overridden inherited construct property
        */
       pspec = g_param_spec_pool_lookup (pspec_pool, pspec->name, parent_type, TRUE);
       if (pspec && pspec->flags & (G_PARAM_CONSTRUCT | G_PARAM_CONSTRUCT_ONLY))
@@ -726,7 +749,7 @@ g_object_class_install_properties (GObjectClass  *oclass,
                                    GParamSpec   **pspecs)
 {
   GType oclass_type, parent_type;
-  gint i;
+  guint i;
 
   g_return_if_fail (G_IS_OBJECT_CLASS (oclass));
   g_return_if_fail (n_pspecs > 1);
@@ -1008,10 +1031,83 @@ g_object_interface_list_properties (gpointer      g_iface,
   return pspecs;
 }
 
+static inline guint
+object_get_optional_flags (GObject *object)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  GObjectReal *real = (GObjectReal *)object;
+  return (guint)g_atomic_int_get (&real->optional_flags);
+#else
+  return 0;
+#endif
+}
+
+static inline void
+object_set_optional_flags (GObject *object,
+                          guint flags)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  GObjectReal *real = (GObjectReal *)object;
+  g_atomic_int_or (&real->optional_flags, flags);
+#endif
+}
+
+static inline void
+object_unset_optional_flags (GObject *object,
+                            guint flags)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  GObjectReal *real = (GObjectReal *)object;
+  g_atomic_int_and (&real->optional_flags, ~flags);
+#endif
+}
+
+gboolean
+_g_object_has_signal_handler  (GObject *object)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  return (object_get_optional_flags (object) & OPTIONAL_FLAG_HAS_SIGNAL_HANDLER) != 0;
+#else
+  return TRUE;
+#endif
+}
+
+void
+_g_object_set_has_signal_handler (GObject     *object)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  object_set_optional_flags (object, OPTIONAL_FLAG_HAS_SIGNAL_HANDLER);
+#endif
+}
+
 static inline gboolean
 object_in_construction (GObject *object)
 {
+#ifdef HAVE_OPTIONAL_FLAGS
+  return (object_get_optional_flags (object) & OPTIONAL_FLAG_IN_CONSTRUCTION) != 0;
+#else
   return g_datalist_id_get_data (&object->qdata, quark_in_construction) != NULL;
+#endif
+}
+
+static inline void
+set_object_in_construction (GObject *object)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  object_set_optional_flags (object, OPTIONAL_FLAG_IN_CONSTRUCTION);
+#else
+  g_datalist_id_set_data (&object->qdata, quark_in_construction, object);
+#endif
+}
+
+static inline void
+unset_object_in_construction (GObject *object)
+{
+#ifdef HAVE_OPTIONAL_FLAGS
+  object_unset_optional_flags (object, OPTIONAL_FLAG_IN_CONSTRUCTION);
+#else
+  g_datalist_id_set_data (&object->qdata, quark_in_construction, NULL);
+#endif
 }
 
 static void
@@ -1030,7 +1126,7 @@ g_object_init (GObject		*object,
   if (CLASS_HAS_CUSTOM_CONSTRUCTOR (class))
     {
       /* mark object in-construction for notify_queue_thaw() and to allow construct-only properties */
-      g_datalist_id_set_data (&object->qdata, quark_in_construction, object);
+      set_object_in_construction (object);
     }
 
   GOBJECT_IF_DEBUG (OBJECTS,
@@ -1521,7 +1617,7 @@ object_interface_check_properties (gpointer check_data,
 
       /* We do a number of checks on the properties of an interface to
        * make sure that all classes implementing the interface are
-       * overriding the properties in a sane way.
+       * overriding the properties correctly.
        *
        * We do the checks in order of importance so that we can give
        * more useful error messages first.
@@ -1649,7 +1745,23 @@ g_object_get_type (void)
  * Creates a new instance of a #GObject subtype and sets its properties.
  *
  * Construction parameters (see #G_PARAM_CONSTRUCT, #G_PARAM_CONSTRUCT_ONLY)
- * which are not explicitly specified are set to their default values.
+ * which are not explicitly specified are set to their default values. Any
+ * private data for the object is guaranteed to be initialized with zeros, as
+ * per g_type_create_instance().
+ *
+ * Note that in C, small integer types in variable argument lists are promoted
+ * up to #gint or #guint as appropriate, and read back accordingly. #gint is 32
+ * bits on every platform on which GLib is currently supported. This means that
+ * you can use C expressions of type #gint with g_object_new() and properties of
+ * type #gint or #guint or smaller. Specifically, you can use integer literals
+ * with these property types.
+ *
+ * When using property types of #gint64 or #guint64, you must ensure that the
+ * value that you provide is 64 bit. This means that you should use a cast or
+ * make use of the %G_GINT64_CONSTANT or %G_GUINT64_CONSTANT macros.
+ *
+ * Similarly, #gfloat is promoted to #gdouble, so you must ensure that the value
+ * you provide is a #gdouble, even for a property of type #gfloat.
  *
  * Returns: (transfer full) (type GObject.Object): a new instance of
  *   @object_type
@@ -1686,7 +1798,7 @@ g_object_new_with_custom_constructor (GObjectClass          *class,
   gint n_cparams;
   gint cvals_used;
   GSList *node;
-  gint i;
+  guint i;
 
   /* If we have ->constructed() then we have to do a lot more work.
    * It's possible that this is a singleton and it's also possible
@@ -1716,7 +1828,7 @@ g_object_new_with_custom_constructor (GObjectClass          *class,
     {
       GParamSpec *pspec;
       GValue *value;
-      gint j;
+      guint j;
 
       pspec = node->data;
       value = NULL; /* to silence gcc... */
@@ -1766,7 +1878,7 @@ g_object_new_with_custom_constructor (GObjectClass          *class,
    */
   newly_constructed = object_in_construction (object);
   if (newly_constructed)
-    g_datalist_id_set_data (&object->qdata, quark_in_construction, NULL);
+    unset_object_in_construction (object);
 
   if (CLASS_HAS_PROPS (class))
     {
@@ -1842,7 +1954,7 @@ g_object_new_internal (GObjectClass          *class,
         {
           const GValue *value;
           GParamSpec *pspec;
-          gint j;
+          guint j;
 
           pspec = node->data;
           value = NULL; /* to silence gcc... */
@@ -1868,7 +1980,7 @@ g_object_new_internal (GObjectClass          *class,
 
   if (nqueue)
     {
-      gint i;
+      guint i;
 
       /* Set remaining properties.  The construct properties will
        * already have been taken, so set only the non-construct
@@ -1893,9 +2005,10 @@ g_object_new_is_valid_property (GType                  object_type,
                                 GParamSpec            *pspec,
                                 const char            *name,
                                 GObjectConstructParam *params,
-                                int                    n_params)
+                                guint                  n_params)
 {
-  gint i;
+  guint i;
+
   if (G_UNLIKELY (pspec == NULL))
     {
       g_critical ("%s: object class '%s' has no property named '%s'",
@@ -2105,13 +2218,15 @@ g_object_new_valist (GType        object_type,
 
   if (first_property_name)
     {
-      GObjectConstructParam stack_params[16];
-      GObjectConstructParam *params;
+      GObjectConstructParam params_stack[16];
+      GValue values_stack[G_N_ELEMENTS (params_stack)];
       const gchar *name;
-      gint n_params = 0;
+      GObjectConstructParam *params = params_stack;
+      GValue *values = values_stack;
+      guint n_params = 0;
+      guint n_params_alloc = G_N_ELEMENTS (params_stack);
 
       name = first_property_name;
-      params = stack_params;
 
       do
         {
@@ -2123,24 +2238,39 @@ g_object_new_valist (GType        object_type,
           if (!g_object_new_is_valid_property (object_type, pspec, name, params, n_params))
             break;
 
-          if (n_params == 16)
+          if (G_UNLIKELY (n_params == n_params_alloc))
             {
-              params = g_new (GObjectConstructParam, n_params + 1);
-              memcpy (params, stack_params, sizeof stack_params);
+              guint i;
+
+              if (n_params_alloc == G_N_ELEMENTS (params_stack))
+                {
+                  n_params_alloc = G_N_ELEMENTS (params_stack) * 2u;
+                  params = g_new (GObjectConstructParam, n_params_alloc);
+                  values = g_new (GValue, n_params_alloc);
+                  memcpy (params, params_stack, sizeof (GObjectConstructParam) * n_params);
+                  memcpy (values, values_stack, sizeof (GValue) * n_params);
+                }
+              else
+                {
+                  n_params_alloc *= 2u;
+                  params = g_realloc (params, sizeof (GObjectConstructParam) * n_params_alloc);
+                  values = g_realloc (values, sizeof (GValue) * n_params_alloc);
+                }
+
+              for (i = 0; i < n_params; i++)
+                params[i].value = &values[i];
             }
-          else if (n_params > 16)
-            params = g_renew (GObjectConstructParam, params, n_params + 1);
 
           params[n_params].pspec = pspec;
-          params[n_params].value = g_newa (GValue, 1);
-          memset (params[n_params].value, 0, sizeof (GValue));
+          params[n_params].value = &values[n_params];
+          memset (&values[n_params], 0, sizeof (GValue));
 
-          G_VALUE_COLLECT_INIT (params[n_params].value, pspec->value_type, var_args, 0, &error);
+          G_VALUE_COLLECT_INIT (&values[n_params], pspec->value_type, var_args, 0, &error);
 
           if (error)
             {
               g_critical ("%s: %s", G_STRFUNC, error);
-              g_value_unset (params[n_params].value);
+              g_value_unset (&values[n_params]);
               g_free (error);
               break;
             }
@@ -2154,8 +2284,11 @@ g_object_new_valist (GType        object_type,
       while (n_params--)
         g_value_unset (params[n_params].value);
 
-      if (params != stack_params)
-        g_free (params);
+      if (G_UNLIKELY (n_params_alloc != G_N_ELEMENTS (params_stack)))
+        {
+          g_free (params);
+          g_free (values);
+        }
     }
   else
     /* Fast case: no properties passed in. */
@@ -2479,6 +2612,11 @@ g_object_get_valist (GObject	 *object,
  *
  * Sets properties on an object.
  *
+ * The same caveats about passing integer literals as varargs apply as with
+ * g_object_new(). In particular, any integer literals set as the values for
+ * properties of type #gint64 or #guint64 must be 64 bits wide, using the
+ * %G_GINT64_CONSTANT or %G_GUINT64_CONSTANT macros.
+ *
  * Note that the "notify" signals are queued and only emitted (in
  * reverse order) after all properties have been set. See
  * g_object_freeze_notify().
@@ -2515,20 +2653,22 @@ g_object_set (gpointer     _object,
  * of three properties: an integer, a string and an object:
  * |[<!-- language="C" --> 
  *  gint intval;
+ *  guint64 uint64val;
  *  gchar *strval;
  *  GObject *objval;
  *
  *  g_object_get (my_object,
  *                "int-property", &intval,
+ *                "uint64-property", &uint64val,
  *                "str-property", &strval,
  *                "obj-property", &objval,
  *                NULL);
  *
- *  // Do something with intval, strval, objval
+ *  // Do something with intval, uint64val, strval, objval
  *
  *  g_free (strval);
  *  g_object_unref (objval);
- *  ]|
+ * ]|
  */
 void
 g_object_get (gpointer     _object,
@@ -2835,7 +2975,7 @@ weak_refs_notify (gpointer data)
  * @data: extra data to pass to notify
  *
  * Adds a weak reference callback to an object. Weak references are
- * used for notification when an object is finalized. They are called
+ * used for notification when an object is disposed. They are called
  * "weak references" because they allow you to safely hold a pointer
  * to an object without calling g_object_ref() (g_object_ref() adds a
  * strong reference, that is, forces the object to stay alive).
@@ -3244,11 +3384,13 @@ gpointer
 {
   GObject *object = _object;
   gint old_val;
+  gboolean object_already_finalized;
 
   g_return_val_if_fail (G_IS_OBJECT (object), NULL);
   
   old_val = g_atomic_int_add (&object->ref_count, 1);
-  g_return_val_if_fail (old_val > 0, NULL);
+  object_already_finalized = (old_val <= 0);
+  g_return_val_if_fail (!object_already_finalized, NULL);
 
   if (old_val == 1 && OBJECT_HAS_TOGGLE_REF (object))
     toggle_refs_notify (object, FALSE);
@@ -3451,7 +3593,7 @@ g_object_get_qdata (GObject *object,
  * @data: (nullable): An opaque user data pointer
  *
  * This sets an opaque, named pointer on an object.
- * The name is specified through a #GQuark (retrived e.g. via
+ * The name is specified through a #GQuark (retrieved e.g. via
  * g_quark_from_static_string()), and the pointer
  * can be gotten back from the @object with g_object_get_qdata()
  * until the @object is finalized.
@@ -3600,7 +3742,7 @@ g_object_set_qdata_full (GObject       *object,
  * {
  *   // the quark, naming the object data
  *   GQuark quark_string_list = g_quark_from_static_string ("my-string-list");
- *   // retrive the old string list
+ *   // retrieve the old string list
  *   GList *list = g_object_steal_qdata (object, quark_string_list);
  *
  *   // prepend new string
@@ -3902,9 +4044,8 @@ g_value_object_lcopy_value (const GValue *value,
 			    guint        collect_flags)
 {
   GObject **object_p = collect_values[0].v_pointer;
-  
-  if (!object_p)
-    return g_strdup_printf ("value location for '%s' passed as NULL", G_VALUE_TYPE_NAME (value));
+
+  g_return_val_if_fail (object_p != NULL, g_strdup_printf ("value location for '%s' passed as NULL", G_VALUE_TYPE_NAME (value)));
 
   if (!value->data[0].v_pointer)
     *object_p = NULL;
@@ -4220,9 +4361,9 @@ g_object_watch_closure (GObject  *object,
  * @object and the created closure. This function is mainly useful
  * when implementing new types of closures.
  *
- * Returns: (transfer full): a newly allocated #GClosure
+ * Returns: (transfer floating): a newly allocated #GClosure
  */
-GClosure*
+GClosure *
 g_closure_new_object (guint    sizeof_closure,
 		      GObject *object)
 {
@@ -4248,9 +4389,9 @@ g_closure_new_object (guint    sizeof_closure,
  * associated with a #GObject, and want the callback to no longer run
  * after the object is is freed.
  *
- * Returns: a new #GCClosure
+ * Returns: (transfer floating): a new #GCClosure
  */
-GClosure*
+GClosure *
 g_cclosure_new_object (GCallback callback_func,
 		       GObject  *object)
 {
@@ -4277,9 +4418,9 @@ g_cclosure_new_object (GCallback callback_func,
  * associated with a #GObject, and want the callback to no longer run
  * after the object is is freed.
  *
- * Returns: a new #GCClosure
+ * Returns: (transfer floating): a new #GCClosure
  */
-GClosure*
+GClosure *
 g_cclosure_new_object_swap (GCallback callback_func,
 			    GObject  *object)
 {

@@ -18,6 +18,7 @@
 
 #include "config.h"
 
+#include "glib-private.h"
 #include "gsettingsschema-internal.h"
 #include "gsettings.h"
 
@@ -343,8 +344,10 @@ initialise_schema_sources (void)
    */
   if G_UNLIKELY (g_once_init_enter (&initialised))
     {
+      gboolean is_setuid = GLIB_PRIVATE_CALL (g_check_setuid) ();
       const gchar * const *dirs;
       const gchar *path;
+      gchar **extra_schema_dirs;
       gint i;
 
       /* iterate in reverse: count up, then count down */
@@ -356,8 +359,18 @@ initialise_schema_sources (void)
 
       try_prepend_data_dir (g_get_user_data_dir ());
 
-      if ((path = g_getenv ("GSETTINGS_SCHEMA_DIR")) != NULL)
-        try_prepend_dir (path);
+      /* Disallow loading extra schemas if running as setuid, as that could
+       * allow reading privileged files. */
+      if (!is_setuid && (path = g_getenv ("GSETTINGS_SCHEMA_DIR")) != NULL)
+        {
+          extra_schema_dirs = g_strsplit (path, G_SEARCHPATH_SEPARATOR_S, 0);
+          for (i = 0; extra_schema_dirs[i]; i++);
+
+          while (i--)
+            try_prepend_dir (extra_schema_dirs[i]);
+
+          g_strfreev (extra_schema_dirs);
+        }
 
       g_once_init_leave (&initialised, TRUE);
     }
@@ -670,8 +683,8 @@ parse_into_text_tables (const gchar *directory,
                         GHashTable  *summaries,
                         GHashTable  *descriptions)
 {
-  GMarkupParser parser = { start_element, end_element, text };
-  TextTableParseInfo info = { summaries, descriptions };
+  GMarkupParser parser = { start_element, end_element, text, NULL, NULL };
+  TextTableParseInfo info = { summaries, descriptions, NULL, NULL, NULL, NULL };
   const gchar *basename;
   GDir *dir;
 
@@ -989,10 +1002,10 @@ g_settings_schema_get_value (GSettingsSchema *schema,
  * database: those located at the path returned by this function.
  *
  * Relocatable schemas can be referenced by other schemas and can
- * threfore describe multiple sets of keys at different locations.  For
+ * therefore describe multiple sets of keys at different locations.  For
  * relocatable schemas, this function will return %NULL.
  *
- * Returns: (transfer none): the path of the schema, or %NULL
+ * Returns: (nullable) (transfer none): the path of the schema, or %NULL
  *
  * Since: 2.32
  **/
@@ -1651,7 +1664,7 @@ g_settings_schema_key_get_name (GSettingsSchemaKey *key)
  * function has to parse all of the source XML files in the schema
  * directory.
  *
- * Returns: the summary for @key, or %NULL
+ * Returns: (nullable): the summary for @key, or %NULL
  *
  * Since: 2.34
  **/
@@ -1686,7 +1699,7 @@ g_settings_schema_key_get_summary (GSettingsSchemaKey *key)
  * function has to parse all of the source XML files in the schema
  * directory.
  *
- * Returns: the description for @key, or %NULL
+ * Returns: (nullable): the description for @key, or %NULL
  *
  * Since: 2.34
  **/

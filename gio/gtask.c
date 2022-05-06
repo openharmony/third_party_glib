@@ -24,8 +24,11 @@
 #include "gasyncresult.h"
 #include "gcancellable.h"
 #include "glib-private.h"
+#include "gtrace-private.h"
 
 #include "glibintl.h"
+
+#include <string.h>
 
 /**
  * SECTION:gtask
@@ -616,6 +619,9 @@ static GSource *task_pool_manager;
 static guint64 task_wait_time;
 static gint tasks_running;
 
+static guint task_pool_max_counter;
+static guint tasks_running_counter;
+
 /* When the task pool fills up and blocks, and the program keeps
  * queueing more tasks, we will slowly add more threads to the pool
  * (in case the existing tasks are trying to queue subtasks of their
@@ -757,6 +763,7 @@ g_task_report_error (gpointer             source_object,
 
   task = g_task_new (source_object, NULL, callback, callback_data);
   g_task_set_source_tag (task, source_tag);
+  g_task_set_name (task, G_STRFUNC);
   g_task_return_error (task, error);
   g_object_unref (task);
 }
@@ -909,7 +916,7 @@ static void g_task_thread_complete (GTask *task);
  * g_task_return_error_if_cancelled() and then returned.
  *
  * This allows you to create a cancellable wrapper around an
- * uninterruptable function. The #GTaskThreadFunc just needs to be
+ * uninterruptible function. The #GTaskThreadFunc just needs to be
  * careful that it does not modify any externally-visible state after
  * it has been cancelled. To do that, the thread should call
  * g_task_set_return_on_cancel() again to (atomically) set
@@ -980,8 +987,8 @@ g_task_set_return_on_cancel (GTask    *task,
  * Since: 2.36
  */
 void
-g_task_set_source_tag (GTask    *task,
-                       gpointer  source_tag)
+(g_task_set_source_tag) (GTask    *task,
+                         gpointer  source_tag)
 {
   g_return_if_fail (G_IS_TASK (task));
 
@@ -1239,6 +1246,7 @@ g_task_return (GTask           *task,
                GTaskReturnType  type)
 {
   GSource *source;
+  gchar *source_name = NULL;
 
   if (type != G_TASK_RETURN_FROM_THREAD)
     task->ever_returned = TRUE;
@@ -1287,7 +1295,10 @@ g_task_return (GTask           *task,
 
   /* Otherwise, complete in the next iteration */
   source = g_idle_source_new ();
-  g_source_set_name (source, "[gio] complete_in_idle_cb");
+  source_name = g_strdup_printf ("[gio] %s complete_in_idle_cb",
+                                 (task->name != NULL) ? task->name : "(unnamed)");
+  g_source_set_name (source, source_name);
+  g_free (source_name);
   g_task_attach_source (task, source, complete_in_idle_cb);
   g_source_unref (source);
 }
@@ -1354,6 +1365,7 @@ task_pool_manager_timeout (gpointer user_data)
 {
   g_mutex_lock (&task_pool_mutex);
   g_thread_pool_set_max_threads (task_pool, tasks_running + 1, NULL);
+  g_trace_set_int64_counter (task_pool_max_counter, tasks_running + 1);
   g_source_set_ready_time (task_pool_manager, -1);
   g_mutex_unlock (&task_pool_mutex);
 
@@ -1366,6 +1378,8 @@ g_task_thread_setup (void)
   g_private_set (&task_private, GUINT_TO_POINTER (TRUE));
   g_mutex_lock (&task_pool_mutex);
   tasks_running++;
+
+  g_trace_set_int64_counter (tasks_running_counter, tasks_running);
 
   if (tasks_running == G_TASK_POOL_SIZE)
     task_wait_time = G_TASK_WAIT_TIME_BASE;
@@ -1387,7 +1401,10 @@ g_task_thread_cleanup (void)
   tasks_pending = g_thread_pool_unprocessed (task_pool);
 
   if (tasks_running > G_TASK_POOL_SIZE)
-    g_thread_pool_set_max_threads (task_pool, tasks_running - 1, NULL);
+    {
+      g_thread_pool_set_max_threads (task_pool, tasks_running - 1, NULL);
+      g_trace_set_int64_counter (task_pool_max_counter, tasks_running - 1);
+    }
   else if (tasks_running + tasks_pending < G_TASK_POOL_SIZE)
     g_source_set_ready_time (task_pool_manager, -1);
 
@@ -1395,6 +1412,9 @@ g_task_thread_cleanup (void)
     task_wait_time /= G_TASK_WAIT_TIME_MULTIPLIER;
 
   tasks_running--;
+
+  g_trace_set_int64_counter (tasks_running_counter, tasks_running);
+
   g_mutex_unlock (&task_pool_mutex);
   g_private_set (&task_private, GUINT_TO_POINTER (FALSE));
 }
@@ -1497,7 +1517,7 @@ g_task_start_task_thread (GTask           *task,
 /**
  * g_task_run_in_thread:
  * @task: a #GTask
- * @task_func: a #GTaskThreadFunc
+ * @task_func: (scope async): a #GTaskThreadFunc
  *
  * Runs @task_func in another thread. When @task_func returns, @task's
  * #GAsyncReadyCallback will be invoked in @task's #GMainContext.
@@ -1540,7 +1560,7 @@ g_task_run_in_thread (GTask           *task,
 /**
  * g_task_run_in_thread_sync:
  * @task: a #GTask
- * @task_func: a #GTaskThreadFunc
+ * @task_func: (scope async): a #GTaskThreadFunc
  *
  * Runs @task_func in another thread, and waits for it to return or be
  * cancelled. You can use g_task_propagate_pointer(), etc, afterward
@@ -1959,6 +1979,100 @@ g_task_had_error (GTask *task)
   return FALSE;
 }
 
+static void
+value_free (gpointer value)
+{
+  g_value_unset (value);
+  g_free (value);
+}
+
+/**
+ * g_task_return_value:
+ * @task: a #GTask
+ * @result: (nullable) (transfer none): the #GValue result of
+ *                                      a task function
+ *
+ * Sets @task's result to @result (by copying it) and completes the task.
+ *
+ * If @result is %NULL then a #GValue of type #G_TYPE_POINTER
+ * with a value of %NULL will be used for the result.
+ *
+ * This is a very generic low-level method intended primarily for use
+ * by language bindings; for C code, g_task_return_pointer() and the
+ * like will normally be much easier to use.
+ *
+ * Since: 2.64
+ */
+void
+g_task_return_value (GTask  *task,
+                     GValue *result)
+{
+  GValue *value;
+
+  g_return_if_fail (G_IS_TASK (task));
+  g_return_if_fail (!task->ever_returned);
+
+  value = g_new0 (GValue, 1);
+
+  if (result == NULL)
+    {
+      g_value_init (value, G_TYPE_POINTER);
+      g_value_set_pointer (value, NULL);
+    }
+  else
+    {
+      g_value_init (value, G_VALUE_TYPE (result));
+      g_value_copy (result, value);
+    }
+
+  g_task_return_pointer (task, value, value_free);
+}
+
+/**
+ * g_task_propagate_value:
+ * @task: a #GTask
+ * @value: (out caller-allocates): return location for the #GValue
+ * @error: return location for a #GError
+ *
+ * Gets the result of @task as a #GValue, and transfers ownership of
+ * that value to the caller. As with g_task_return_value(), this is
+ * a generic low-level method; g_task_propagate_pointer() and the like
+ * will usually be more useful for C code.
+ *
+ * If the task resulted in an error, or was cancelled, then this will
+ * instead set @error and return %FALSE.
+ *
+ * Since this method transfers ownership of the return value (or
+ * error) to the caller, you may only call it once.
+ *
+ * Returns: %TRUE if @task succeeded, %FALSE on error.
+ *
+ * Since: 2.64
+ */
+gboolean
+g_task_propagate_value (GTask   *task,
+                        GValue  *value,
+                        GError **error)
+{
+  g_return_val_if_fail (G_IS_TASK (task), FALSE);
+  g_return_val_if_fail (value != NULL, FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  if (g_task_propagate_error (task, error))
+    return FALSE;
+
+  g_return_val_if_fail (task->result_set, FALSE);
+  g_return_val_if_fail (task->result_destroy == value_free, FALSE);
+
+  memcpy (value, task->result.pointer, sizeof (GValue));
+  g_free (task->result.pointer);
+
+  task->result_destroy = NULL;
+  task->result_set = FALSE;
+
+  return TRUE;
+}
+
 /**
  * g_task_get_completed:
  * @task: a #GTask.
@@ -2048,7 +2162,9 @@ GSourceFuncs trivial_source_funcs = {
   NULL, /* prepare */
   NULL, /* check */
   trivial_source_dispatch,
-  NULL
+  NULL, /* finalize */
+  NULL, /* closure */
+  NULL  /* marshal */
 };
 
 static void
@@ -2113,6 +2229,16 @@ g_task_class_init (GTaskClass *klass)
                           P_("Task completed"),
                           P_("Whether the task has completed yet"),
                           FALSE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  if (G_UNLIKELY (task_pool_max_counter == 0))
+    {
+      /* We use two counters to track characteristics of the GTask thread pool.
+       * task pool max size - the value of g_thread_pool_set_max_threads()
+       * tasks running - the number of running threads
+       */
+      task_pool_max_counter = g_trace_define_int64_counter ("GIO", "task pool max size", "Maximum number of threads allowed in the GTask thread pool; see g_thread_pool_set_max_threads()");
+      tasks_running_counter = g_trace_define_int64_counter ("GIO", "tasks running", "Number of currently running tasks in the GTask thread pool");
+    }
 }
 
 static gpointer

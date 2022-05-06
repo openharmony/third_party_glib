@@ -189,7 +189,7 @@ foo_set_property (GDBusConnection       *connection,
                G_DBUS_ERROR,
                G_DBUS_ERROR_SPAWN_FILE_INVALID,
                "Returning some error instead of writing the value '%s' to the property '%s'",
-               property_name, s);
+               s, property_name);
   g_free (s);
   return FALSE;
 }
@@ -927,7 +927,7 @@ test_dispatch_thread_func (gpointer user_data)
     {
       /* _with_closures variant doesn't support customizing error data. */
       g_assert_error (error, G_DBUS_ERROR, G_DBUS_ERROR_SPAWN_FILE_INVALID);
-      g_assert_cmpstr (error->message, ==, "GDBus.Error:org.freedesktop.DBus.Error.Spawn.FileInvalid: Returning some error instead of writing the value 'NotReadable' to the property ''But Writable you are!''");
+      g_assert_cmpstr (error->message, ==, "GDBus.Error:org.freedesktop.DBus.Error.Spawn.FileInvalid: Returning some error instead of writing the value ''But Writable you are!'' to the property 'NotReadable'");
     }
   g_assert (error != NULL && error->domain == G_DBUS_ERROR);
   g_error_free (error);
@@ -1279,7 +1279,7 @@ test_object_registration (void)
   g_strfreev (nodes);
   g_assert_cmpint (count_interfaces (c, "/foo/dyna/dynamicallycreated"), ==, 4);
 
-  /* now check that the object hierarachy is properly generated... yes, it's a bit
+  /* now check that the object hierarchy is properly generated... yes, it's a bit
    * perverse that we round-trip to the bus to introspect ourselves ;-)
    */
   nodes = get_nodes_at (c, "/");

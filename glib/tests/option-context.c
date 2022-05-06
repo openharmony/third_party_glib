@@ -26,6 +26,26 @@
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
+#include <math.h>
+
+#ifdef _MSC_VER
+# ifndef NAN
+/*
+ * From the Visual Studio 2013+ math.h, we have the following:
+ * #ifndef _HUGE_ENUF
+ *    #define _HUGE_ENUF  1e+300  // _HUGE_ENUF*_HUGE_ENUF must overflow
+ * #endif
+ *
+ * #define INFINITY   ((float)(_HUGE_ENUF * _HUGE_ENUF))
+ * ...
+ * #define NAN        ((float)(INFINITY * 0.0F))
+ * ...
+ * so, HUVE_VAL * HUGE_VAL would be a good approximation of INFINITY without
+ * defining anything extra
+ */
+#  define NAN HUGE_VAL * HUGE_VAL * 0.0f
+# endif
+#endif
 
 static GOptionEntry main_entries[] = {
   { "main-switch", 0, 0,
@@ -111,7 +131,8 @@ test_group_captions (void)
 {
   const gchar *test_name_base[] = { "help", "help-all", "help-test" };
   gchar *test_name;
-  gint i, j;
+  guint i;
+  gsize j;
 
   g_test_bug ("504142");
 
@@ -132,7 +153,7 @@ test_group_captions (void)
           if (g_test_verbose ())
             trap_flags |= G_TEST_SUBPROCESS_INHERIT_STDOUT | G_TEST_SUBPROCESS_INHERIT_STDERR;
 
-          test_name = g_strdup_printf ("/option/group/captions/subprocess/%s-%d",
+          test_name = g_strdup_printf ("/option/group/captions/subprocess/%s-%u",
                                        test_name_base[j], i);
           g_test_trap_subprocess (test_name, 0, trap_flags);
           g_free (test_name);
@@ -256,7 +277,7 @@ join_stringv (int argc, char **argv)
 static char **
 copy_stringv (char **argv, int argc)
 {
-  return g_memdup (argv, sizeof (char *) * (argc + 1));
+  return g_memdup2 (argv, sizeof (char *) * (argc + 1));
 }
 
 static void
@@ -578,7 +599,6 @@ arg_test3 (void)
   g_free (argv);
   g_option_context_free (context);
 }
-
 
 static void
 arg_test4 (void)
@@ -942,7 +962,7 @@ callback_test_optional_5 (void)
   gchar **argv_copy;
   int argc;
   GOptionEntry entries [] =
-    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL },
+    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL, NULL },
       { "test", 't', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, 
 	callback_parse_optional, NULL, NULL },
       { NULL } };
@@ -980,7 +1000,7 @@ callback_test_optional_6 (void)
   gchar **argv_copy;
   int argc;
   GOptionEntry entries [] =
-    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL },
+    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL, NULL },
       { "test", 't', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, 
 	callback_parse_optional, NULL, NULL },
       { NULL } };
@@ -1018,7 +1038,7 @@ callback_test_optional_7 (void)
   gchar **argv_copy;
   int argc;
   GOptionEntry entries [] =
-    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL },
+    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL, NULL },
       { "test", 't', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, 
 	callback_parse_optional, NULL, NULL },
       { NULL } };
@@ -1056,7 +1076,7 @@ callback_test_optional_8 (void)
   gchar **argv_copy;
   int argc;
   GOptionEntry entries [] =
-    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL },
+    { { "dummy", 'd', 0, G_OPTION_ARG_NONE, &dummy, NULL, NULL },
       { "test", 't', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, 
 	callback_parse_optional, NULL, NULL },
       { NULL } };
@@ -1331,8 +1351,8 @@ ignore_test3 (void)
   g_option_context_free (context);
 }
 
-void
-static array_test1 (void)
+static void
+array_test1 (void)
 {
   GOptionContext *context;
   gboolean retval;
@@ -2323,7 +2343,7 @@ test_group_parse (void)
   g_option_context_add_group (context, group);
 
   argv = split_string ("program --test arg1 -f arg2 --group-test arg3 --frob arg4 -z arg5", &argc);
-  orig_argv = g_memdup (argv, (argc + 1) * sizeof (char *));
+  orig_argv = g_memdup2 (argv, (argc + 1) * sizeof (char *));
 
   retval = g_option_context_parse (context, &argc, &argv, &error);
 
@@ -2361,7 +2381,7 @@ option_context_parse_command_line (GOptionContext *context,
   argv_new_len = g_strv_length (argv);
 
   g_strfreev (argv);
-  return success ? argv_len - argv_new_len : -1;
+  return success ? (gint) (argv_len - argv_new_len) : -1;
 }
 
 static void
@@ -2559,6 +2579,39 @@ double_free (void)
 
 }
 
+static void
+double_zero (void)
+{
+  GOptionContext *context;
+  gboolean retval;
+  GError *error = NULL;
+  gchar **argv_copy;
+  gchar **argv;
+  int argc;
+  double test_val = NAN;
+  GOptionEntry entries [] =
+    { { "test", 0, 0, G_OPTION_ARG_DOUBLE, &test_val, NULL, NULL },
+      { NULL } };
+
+  context = g_option_context_new (NULL);
+  g_option_context_add_main_entries (context, entries, NULL);
+
+  /* Now try parsing */
+  argv = split_string ("program --test 0", &argc);
+  argv_copy = copy_stringv (argv, argc);
+
+  retval = g_option_context_parse (context, &argc, &argv, &error);
+  g_assert_no_error (error);
+  g_assert (retval);
+
+  /* Last arg specified is the one that should be stored */
+  g_assert (test_val == 0);
+
+  g_strfreev (argv_copy);
+  g_free (argv);
+  g_option_context_free (context);
+}
+
 int
 main (int   argc,
       char *argv[])
@@ -2673,6 +2726,7 @@ main (int   argc,
   g_test_add_func ("/option/bug/dash-arg", dash_arg_test);
   g_test_add_func ("/option/bug/short-remaining", short_remaining);
   g_test_add_func ("/option/bug/double-free", double_free);
+  g_test_add_func ("/option/bug/double-zero", double_zero);
 
   return g_test_run();
 }

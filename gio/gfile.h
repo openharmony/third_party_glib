@@ -111,10 +111,13 @@ typedef struct _GFileIface    		GFileIface;
  * @make_directory: Makes a directory.
  * @make_directory_async: Asynchronously makes a directory.
  * @make_directory_finish: Finishes making a directory asynchronously.
- * @make_symbolic_link: Makes a symbolic link.
+ * @make_symbolic_link: (nullable): Makes a symbolic link. %NULL if symbolic
+ *    links are unsupported.
  * @_make_symbolic_link_async: Asynchronously makes a symbolic link
  * @_make_symbolic_link_finish: Finishes making a symbolic link asynchronously.
- * @copy: Copies a file.
+ * @copy: (nullable): Copies a file. %NULL if copying is unsupported, which will
+ *     cause `GFile` to use a fallback copy method where it reads from the
+ *     source and writes to the destination.
  * @copy_async: Asynchronously copies a file.
  * @copy_finish: Finishes an asynchronous copy operation.
  * @move: Moves a file.
@@ -1089,6 +1092,12 @@ void                    g_file_eject_mountable_with_operation (GFile            
 GLIB_AVAILABLE_IN_ALL
 gboolean                g_file_eject_mountable_with_operation_finish (GFile           *file,
 							   GAsyncResult               *result,
+							   GError                    **error);
+
+GLIB_AVAILABLE_IN_2_68
+char *			g_file_build_attribute_list_for_copy (GFile                   *file,
+							   GFileCopyFlags              flags,
+							   GCancellable               *cancellable,
 							   GError                    **error);
 
 GLIB_AVAILABLE_IN_ALL

@@ -22,12 +22,15 @@
 
 /* For the #GDesktopAppInfoLookup macros; since macro deprecation is implemented
  * in the preprocessor, we need to define this before including glib.h*/
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include <string.h>
 
 #include "giomodule.h"
 #include "giomodule-priv.h"
+#include "glib-private.h"
 #include "glocalfilemonitor.h"
 #include "gnativevolumemonitor.h"
 #include "gproxyresolver.h"
@@ -42,8 +45,12 @@
 #include "gnotificationbackend.h"
 #include "ginitable.h"
 #include "gnetworkmonitor.h"
+#include "gmemorymonitor.h"
+#include "gmemorymonitorportal.h"
+#include "gmemorymonitordbus.h"
 #ifdef G_OS_WIN32
 #include "gregistrysettingsbackend.h"
+#include "giowin32-priv.h"
 #endif
 #include <glib/gstdio.h>
 
@@ -441,7 +448,7 @@ is_valid_module_name (const gchar        *basename,
  *
  * This may not actually load and initialize all the types in each
  * module, some modules may be lazily loaded and initialized when
- * an extension point it implementes is used with e.g.
+ * an extension point it implements is used with e.g.
  * g_io_extension_point_get_extensions() or
  * g_io_extension_point_get_extension_by_name().
  *
@@ -459,7 +466,7 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
   GDir *dir;
   GStatBuf statbuf;
   char *data;
-  time_t cache_mtime;
+  time_t cache_time;
   GHashTable *cache;
 
   if (!g_module_supported ())
@@ -471,24 +478,25 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
 
   filename = g_build_filename (dirname, "giomodule.cache", NULL);
 
-  cache = g_hash_table_new_full (g_str_hash, g_str_equal,
-				 g_free, (GDestroyNotify)g_strfreev);
-
-  cache_mtime = 0;
+  cache = NULL;
+  cache_time = 0;
   if (g_stat (filename, &statbuf) == 0 &&
       g_file_get_contents (filename, &data, NULL, NULL))
     {
       char **lines;
       int i;
 
-      /* Cache mtime is the time the cache file was created, any file
-       * that has a ctime before this was created then and not modified
-       * since then (userspace can't change ctime). Its possible to change
-       * the ctime forward without changing the file content, by e.g.
-       * chmoding the file, but this is uncommon and will only cause us
-       * to not use the cache so will not cause bugs.
+      /* cache_time is the time the cache file was created; we also take
+       * into account the change time because in ostree based systems, all
+       * system file have mtime equal to epoch 0.
+       *
+       * Any file that has a ctime before this was created then and not modified
+       * since then (userspace can't change ctime). Its possible to change the
+       * ctime forward without changing the file content, by e.g.  chmoding the
+       * file, but this is uncommon and will only cause us to not use the cache
+       * so will not cause bugs.
        */
-      cache_mtime = statbuf.st_mtime;
+      cache_time = MAX(statbuf.st_mtime, statbuf.st_ctime);
 
       lines = g_strsplit (data, "\n", -1);
       g_free (data);
@@ -514,6 +522,10 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
 	  while (g_ascii_isspace (*colon))
 	    colon++;
 
+          if (G_UNLIKELY (!cache))
+            cache = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                           g_free, (GDestroyNotify)g_strfreev);
+
 	  extension_points = g_strsplit (colon, ",", -1);
 	  g_hash_table_insert (cache, file, extension_points);
 	}
@@ -527,16 +539,18 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
 	  GIOExtensionPoint *extension_point;
 	  GIOModule *module;
 	  gchar *path;
-	  char **extension_points;
+	  char **extension_points = NULL;
 	  int i;
 
 	  path = g_build_filename (dirname, name, NULL);
 	  module = g_io_module_new (path);
 
-	  extension_points = g_hash_table_lookup (cache, name);
+          if (cache)
+            extension_points = g_hash_table_lookup (cache, name);
+
 	  if (extension_points != NULL &&
 	      g_stat (path, &statbuf) == 0 &&
-	      statbuf.st_ctime <= cache_mtime)
+	      statbuf.st_ctime <= cache_time)
 	    {
 	      /* Lazy load/init the library when first required */
 	      for (i = 0; extension_points[i] != NULL; i++)
@@ -568,7 +582,8 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
 
   g_dir_close (dir);
 
-  g_hash_table_destroy (cache);
+  if (cache)
+    g_hash_table_destroy (cache);
 
   g_free (filename);
 }
@@ -583,7 +598,7 @@ g_io_modules_scan_all_in_directory_with_scope (const char     *dirname,
  *
  * This may not actually load and initialize all the types in each
  * module, some modules may be lazily loaded and initialized when
- * an extension point it implementes is used with e.g.
+ * an extension point it implements is used with e.g.
  * g_io_extension_point_get_extensions() or
  * g_io_extension_point_get_extension_by_name().
  *
@@ -798,6 +813,9 @@ _g_io_module_get_default_type (const gchar *extension_point,
       return G_TYPE_INVALID;
     }
 
+  /* It’s OK to query the environment here, even when running as setuid, because
+   * it only allows a choice between existing already-loaded modules. No new
+   * code is loaded based on the environment variable value. */
   use_this = envvar ? g_getenv (envvar) : NULL;
   if (g_strcmp0 (use_this, "help") == 0)
     {
@@ -875,6 +893,13 @@ try_implementation (const char           *extension_point,
     }
 }
 
+static void
+weak_ref_free (GWeakRef *weak_ref)
+{
+  g_weak_ref_clear (weak_ref);
+  g_free (weak_ref);
+}
+
 /**
  * _g_io_module_get_default:
  * @extension_point: the name of an extension point
@@ -896,10 +921,11 @@ try_implementation (const char           *extension_point,
  * be called on each candidate implementation after construction, to
  * check if it is actually usable or not.
  *
- * The result is cached after it is generated the first time, and
+ * The result is cached after it is generated the first time (but the cache does
+ * not keep a strong reference to the object), and
  * the function is thread-safe.
  *
- * Returns: (transfer none): an object implementing
+ * Returns: (transfer full) (nullable): an object implementing
  *     @extension_point, or %NULL if there are no usable
  *     implementations.
  */
@@ -914,25 +940,33 @@ _g_io_module_get_default (const gchar         *extension_point,
   GList *l;
   GIOExtensionPoint *ep;
   GIOExtension *extension = NULL, *preferred;
-  gpointer impl;
+  gpointer impl, value;
+  GWeakRef *impl_weak_ref = NULL;
 
   g_rec_mutex_lock (&default_modules_lock);
   if (default_modules)
     {
-      gpointer key;
-
       if (g_hash_table_lookup_extended (default_modules, extension_point,
-					&key, &impl))
-	{
+                                        NULL, &value))
+        {
           /* Don’t debug here, since we’re returning a cached object which was
            * already printed earlier. */
-	  g_rec_mutex_unlock (&default_modules_lock);
-	  return impl;
-	}
+          impl_weak_ref = value;
+          impl = g_weak_ref_get (impl_weak_ref);
+
+          /* If the object has been finalised (impl == NULL), fall through and
+           * instantiate a new one. */
+          if (impl != NULL)
+            {
+              g_rec_mutex_unlock (&default_modules_lock);
+              return g_steal_pointer (&impl);
+            }
+        }
     }
   else
     {
-      default_modules = g_hash_table_new (g_str_hash, g_str_equal);
+      default_modules = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                               g_free, (GDestroyNotify) weak_ref_free);
     }
 
   _g_io_modules_ensure_loaded ();
@@ -947,6 +981,9 @@ _g_io_module_get_default (const gchar         *extension_point,
       return NULL;
     }
 
+  /* It’s OK to query the environment here, even when running as setuid, because
+   * it only allows a choice between existing already-loaded modules. No new
+   * code is loaded based on the environment variable value. */
   use_this = envvar ? g_getenv (envvar) : NULL;
   if (g_strcmp0 (use_this, "help") == 0)
     {
@@ -984,9 +1021,18 @@ _g_io_module_get_default (const gchar         *extension_point,
   impl = NULL;
 
  done:
-  g_hash_table_insert (default_modules,
-		       g_strdup (extension_point),
-		       impl ? g_object_ref (impl) : NULL);
+  if (impl_weak_ref == NULL)
+    {
+      impl_weak_ref = g_new0 (GWeakRef, 1);
+      g_weak_ref_init (impl_weak_ref, impl);
+      g_hash_table_insert (default_modules, g_strdup (extension_point),
+                           g_steal_pointer (&impl_weak_ref));
+    }
+  else
+    {
+      g_weak_ref_set (impl_weak_ref, impl);
+    }
+
   g_rec_mutex_unlock (&default_modules_lock);
 
   if (impl != NULL)
@@ -1000,7 +1046,7 @@ _g_io_module_get_default (const gchar         *extension_point,
     g_debug ("%s: Failed to find default implementation for ‘%s’",
              G_STRFUNC, extension_point);
 
-  return impl;
+  return g_steal_pointer (&impl);
 }
 
 G_LOCK_DEFINE_STATIC (registered_extensions);
@@ -1024,6 +1070,9 @@ extern GType g_network_monitor_base_get_type (void);
 extern GType _g_network_monitor_netlink_get_type (void);
 extern GType _g_network_monitor_nm_get_type (void);
 #endif
+
+extern GType g_memory_monitor_dbus_get_type (void);
+extern GType g_memory_monitor_portal_get_type (void);
 
 #ifdef G_OS_UNIX
 extern GType g_fdo_notification_backend_get_type (void);
@@ -1057,7 +1106,10 @@ DllMain (HINSTANCE hinstDLL,
 	 LPVOID    lpvReserved)
 {
   if (fdwReason == DLL_PROCESS_ATTACH)
+    {
       gio_dll = hinstDLL;
+      gio_win32_appinfo_init (FALSE);
+    }
 
   return TRUE;
 }
@@ -1068,7 +1120,8 @@ void *
 _g_io_win32_get_module (void)
 {
   if (!gio_dll)
-    GetModuleHandleExA (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+    GetModuleHandleExA (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                         (const char *) _g_io_win32_get_module,
                         &gio_dll);
   return gio_dll;
@@ -1127,6 +1180,9 @@ _g_io_modules_ensure_extension_points_registered (void)
 
       ep = g_io_extension_point_register (G_NOTIFICATION_BACKEND_EXTENSION_POINT_NAME);
       g_io_extension_point_set_required_type (ep, G_TYPE_NOTIFICATION_BACKEND);
+
+      ep = g_io_extension_point_register (G_MEMORY_MONITOR_EXTENSION_POINT_NAME);
+      g_io_extension_point_set_required_type (ep, G_TYPE_MEMORY_MONITOR);
     }
   
   G_UNLOCK (registered_extensions);
@@ -1136,26 +1192,25 @@ static gchar *
 get_gio_module_dir (void)
 {
   gchar *module_dir;
+  gboolean is_setuid = GLIB_PRIVATE_CALL (g_check_setuid) ();
 
-  module_dir = g_strdup (g_getenv ("GIO_MODULE_DIR"));
+  /* If running as setuid, loading modules from an arbitrary directory
+   * controlled by the unprivileged user who is running the program could allow
+   * for execution of arbitrary code (in constructors in modules).
+   * Don’t allow it.
+   *
+   * If a setuid program somehow needs to load additional GIO modules, it should
+   * explicitly call g_io_modules_scan_all_in_directory(). */
+  module_dir = !is_setuid ? g_strdup (g_getenv ("GIO_MODULE_DIR")) : NULL;
   if (module_dir == NULL)
     {
 #ifdef G_OS_WIN32
       gchar *install_dir;
 
       install_dir = g_win32_get_package_installation_directory_of_module (gio_dll);
-#ifdef _MSC_VER
-      /* On Visual Studio builds we have all the libraries and binaries in bin
-       * so better load the gio modules from bin instead of lib
-       */
-      module_dir = g_build_filename (install_dir,
-                                     "bin", "gio", "modules",
-                                     NULL);
-#else
       module_dir = g_build_filename (install_dir,
                                      "lib", "gio", "modules",
                                      NULL);
-#endif
       g_free (install_dir);
 #else
       module_dir = g_strdup (GIO_MODULE_DIR);
@@ -1178,13 +1233,14 @@ _g_io_modules_ensure_loaded (void)
 
   if (!loaded_dirs)
     {
+      gboolean is_setuid = GLIB_PRIVATE_CALL (g_check_setuid) ();
       gchar *module_dir;
 
       loaded_dirs = TRUE;
       scope = g_io_module_scope_new (G_IO_MODULE_SCOPE_BLOCK_DUPLICATES);
 
-      /* First load any overrides, extras */
-      module_path = g_getenv ("GIO_EXTRA_MODULES");
+      /* First load any overrides, extras (but not if running as setuid!) */
+      module_path = !is_setuid ? g_getenv ("GIO_EXTRA_MODULES") : NULL;
       if (module_path)
 	{
 	  gchar **paths;
@@ -1235,6 +1291,8 @@ _g_io_modules_ensure_loaded (void)
       g_type_ensure (g_fdo_notification_backend_get_type ());
       g_type_ensure (g_gtk_notification_backend_get_type ());
       g_type_ensure (g_portal_notification_backend_get_type ());
+      g_type_ensure (g_memory_monitor_dbus_get_type ());
+      g_type_ensure (g_memory_monitor_portal_get_type ());
       g_type_ensure (g_network_monitor_portal_get_type ());
       g_type_ensure (g_proxy_resolver_portal_get_type ());
 #endif

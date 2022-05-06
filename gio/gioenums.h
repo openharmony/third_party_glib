@@ -117,7 +117,7 @@ typedef enum {
 
 /**
  * GFileAttributeType:
- * @G_FILE_ATTRIBUTE_TYPE_INVALID: indicates an invalid or uninitalized type.
+ * @G_FILE_ATTRIBUTE_TYPE_INVALID: indicates an invalid or uninitialized type.
  * @G_FILE_ATTRIBUTE_TYPE_STRING: a null terminated UTF8 string.
  * @G_FILE_ATTRIBUTE_TYPE_BYTE_STRING: a zero terminated string of non-zero bytes.
  * @G_FILE_ATTRIBUTE_TYPE_BOOLEAN: a boolean value.
@@ -199,7 +199,9 @@ typedef enum {
  *    rather than a "save new version of" replace operation.
  *    You can think of it as "unlink destination" before
  *    writing to it, although the implementation may not
- *    be exactly like that. Since 2.20
+ *    be exactly like that. This flag can only be used with
+ *    g_file_replace() and its variants, including g_file_replace_contents().
+ *    Since 2.20
  *
  * Flags used when an operation may create a file.
  */
@@ -1204,6 +1206,8 @@ typedef enum
  * message bus. This means that the Hello() method will be invoked as part of the connection setup.
  * @G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING: If set, processing of D-Bus messages is
  * delayed until g_dbus_connection_start_message_processing() is called.
+ * @G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_REQUIRE_SAME_USER: When authenticating
+ * as a server, require the UID of the peer to be the same as the UID of the server. (Since: 2.68)
  *
  * Flags used when creating a new #GDBusConnection.
  *
@@ -1215,7 +1219,8 @@ typedef enum {
   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_SERVER = (1<<1),
   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_ALLOW_ANONYMOUS = (1<<2),
   G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION = (1<<3),
-  G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING = (1<<4)
+  G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING = (1<<4),
+  G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_REQUIRE_SAME_USER GLIB_AVAILABLE_ENUMERATOR_IN_2_68 = (1<<5)
 } GDBusConnectionFlags;
 
 /**
@@ -1366,6 +1371,8 @@ typedef enum
  * details).
  * @G_DBUS_SERVER_FLAGS_AUTHENTICATION_ALLOW_ANONYMOUS: Allow the anonymous
  * authentication method.
+ * @G_DBUS_SERVER_FLAGS_AUTHENTICATION_REQUIRE_SAME_USER: Require the UID of the
+ * peer to be the same as the UID of the server when authenticating. (Since: 2.68)
  *
  * Flags used when creating a #GDBusServer.
  *
@@ -1375,7 +1382,8 @@ typedef enum
 {
   G_DBUS_SERVER_FLAGS_NONE = 0,
   G_DBUS_SERVER_FLAGS_RUN_IN_THREAD = (1<<0),
-  G_DBUS_SERVER_FLAGS_AUTHENTICATION_ALLOW_ANONYMOUS = (1<<1)
+  G_DBUS_SERVER_FLAGS_AUTHENTICATION_ALLOW_ANONYMOUS = (1<<1),
+  G_DBUS_SERVER_FLAGS_AUTHENTICATION_REQUIRE_SAME_USER GLIB_AVAILABLE_ENUMERATOR_IN_2_68 = (1<<2)
 } GDBusServerFlags;
 
 /**
@@ -1423,11 +1431,12 @@ typedef enum
 /**
  * GCredentialsType:
  * @G_CREDENTIALS_TYPE_INVALID: Indicates an invalid native credential type.
- * @G_CREDENTIALS_TYPE_LINUX_UCRED: The native credentials type is a struct ucred.
- * @G_CREDENTIALS_TYPE_FREEBSD_CMSGCRED: The native credentials type is a struct cmsgcred.
- * @G_CREDENTIALS_TYPE_OPENBSD_SOCKPEERCRED: The native credentials type is a struct sockpeercred. Added in 2.30.
- * @G_CREDENTIALS_TYPE_SOLARIS_UCRED: The native credentials type is a ucred_t. Added in 2.40.
- * @G_CREDENTIALS_TYPE_NETBSD_UNPCBID: The native credentials type is a struct unpcbid.
+ * @G_CREDENTIALS_TYPE_LINUX_UCRED: The native credentials type is a `struct ucred`.
+ * @G_CREDENTIALS_TYPE_FREEBSD_CMSGCRED: The native credentials type is a `struct cmsgcred`.
+ * @G_CREDENTIALS_TYPE_OPENBSD_SOCKPEERCRED: The native credentials type is a `struct sockpeercred`. Added in 2.30.
+ * @G_CREDENTIALS_TYPE_SOLARIS_UCRED: The native credentials type is a `ucred_t`. Added in 2.40.
+ * @G_CREDENTIALS_TYPE_NETBSD_UNPCBID: The native credentials type is a `struct unpcbid`. Added in 2.42.
+ * @G_CREDENTIALS_TYPE_APPLE_XUCRED: The native credentials type is a `struct xucred`. Added in 2.66.
  *
  * Enumeration describing different kinds of native credential types.
  *
@@ -1440,7 +1449,8 @@ typedef enum
   G_CREDENTIALS_TYPE_FREEBSD_CMSGCRED,
   G_CREDENTIALS_TYPE_OPENBSD_SOCKPEERCRED,
   G_CREDENTIALS_TYPE_SOLARIS_UCRED,
-  G_CREDENTIALS_TYPE_NETBSD_UNPCBID
+  G_CREDENTIALS_TYPE_NETBSD_UNPCBID,
+  G_CREDENTIALS_TYPE_APPLE_XUCRED,
 } GCredentialsType;
 
 /**
@@ -1608,6 +1618,61 @@ typedef enum {
   G_TLS_AUTHENTICATION_REQUESTED,
   G_TLS_AUTHENTICATION_REQUIRED
 } GTlsAuthenticationMode;
+
+/**
+ * GTlsChannelBindingType:
+ * @G_TLS_CHANNEL_BINDING_TLS_UNIQUE:
+ *    [`tls-unique`](https://tools.ietf.org/html/rfc5929#section-3) binding
+ *    type
+ * @G_TLS_CHANNEL_BINDING_TLS_SERVER_END_POINT:
+ *    [`tls-server-end-point`](https://tools.ietf.org/html/rfc5929#section-4)
+ *    binding type
+ *
+ * The type of TLS channel binding data to retrieve from #GTlsConnection
+ * or #GDtlsConnection, as documented by RFC 5929. The
+ * [`tls-unique-for-telnet`](https://tools.ietf.org/html/rfc5929#section-5)
+ * binding type is not currently implemented.
+ *
+ * Since: 2.66
+ */
+GLIB_AVAILABLE_TYPE_IN_2_66
+typedef enum {
+  G_TLS_CHANNEL_BINDING_TLS_UNIQUE,
+  G_TLS_CHANNEL_BINDING_TLS_SERVER_END_POINT
+} GTlsChannelBindingType;
+
+/**
+ * GTlsChannelBindingError:
+ * @G_TLS_CHANNEL_BINDING_ERROR_NOT_IMPLEMENTED: Either entire binding
+ *    retrieval facility or specific binding type is not implemented in the
+ *    TLS backend.
+ * @G_TLS_CHANNEL_BINDING_ERROR_INVALID_STATE: The handshake is not yet
+ *    complete on the connection which is a strong requirement for any existing
+ *    binding type.
+ * @G_TLS_CHANNEL_BINDING_ERROR_NOT_AVAILABLE: Handshake is complete but
+ *    binding data is not available. That normally indicates the TLS
+ *    implementation failed to provide the binding data. For example, some
+ *    implementations do not provide a peer certificate for resumed connections.
+ * @G_TLS_CHANNEL_BINDING_ERROR_NOT_SUPPORTED: Binding type is not supported
+ *    on the current connection. This error could be triggered when requesting
+ *    `tls-server-end-point` binding data for a certificate which has no hash
+ *    function or uses multiple hash functions.
+ * @G_TLS_CHANNEL_BINDING_ERROR_GENERAL_ERROR: Any other backend error
+ *    preventing binding data retrieval.
+ *
+ * An error code used with %G_TLS_CHANNEL_BINDING_ERROR in a #GError to
+ * indicate a TLS channel binding retrieval error.
+ *
+ * Since: 2.66
+ */
+GLIB_AVAILABLE_TYPE_IN_2_66
+typedef enum {
+  G_TLS_CHANNEL_BINDING_ERROR_NOT_IMPLEMENTED,
+  G_TLS_CHANNEL_BINDING_ERROR_INVALID_STATE,
+  G_TLS_CHANNEL_BINDING_ERROR_NOT_AVAILABLE,
+  G_TLS_CHANNEL_BINDING_ERROR_NOT_SUPPORTED,
+  G_TLS_CHANNEL_BINDING_ERROR_GENERAL_ERROR
+} GTlsChannelBindingError;
 
 /**
  * GTlsRehandshakeMode:
@@ -1963,6 +2028,35 @@ typedef enum {
   G_POLLABLE_RETURN_OK           = 1,
   G_POLLABLE_RETURN_WOULD_BLOCK  = -G_IO_ERROR_WOULD_BLOCK
 } GPollableReturn;
+
+/**
+ * GMemoryMonitorWarningLevel:
+ * @G_MEMORY_MONITOR_WARNING_LEVEL_LOW: Memory on the device is low, processes
+ *   should free up unneeded resources (for example, in-memory caches) so they can
+ *   be used elsewhere.
+ * @G_MEMORY_MONITOR_WARNING_LEVEL_MEDIUM: Same as @G_MEMORY_MONITOR_WARNING_LEVEL_LOW
+ *   but the device has even less free memory, so processes should try harder to free
+ *   up unneeded resources. If your process does not need to stay running, it is a
+ *   good time for it to quit.
+ * @G_MEMORY_MONITOR_WARNING_LEVEL_CRITICAL: The system will soon start terminating
+ *   processes to reclaim memory, including background processes.
+ *
+ * Memory availability warning levels.
+ *
+ * Note that because new values might be added, it is recommended that applications check
+ * #GMemoryMonitorWarningLevel as ranges, for example:
+ * |[<!-- language="C" -->
+ * if (warning_level > G_MEMORY_MONITOR_WARNING_LEVEL_LOW)
+ *   drop_caches ();
+ * ]|
+ *
+ * Since: 2.64
+ */
+typedef enum {
+  G_MEMORY_MONITOR_WARNING_LEVEL_LOW      = 50,
+  G_MEMORY_MONITOR_WARNING_LEVEL_MEDIUM   = 100,
+  G_MEMORY_MONITOR_WARNING_LEVEL_CRITICAL = 255
+} GMemoryMonitorWarningLevel;
 
 G_END_DECLS
 

@@ -21,7 +21,9 @@
  * Author: Matthias Clasen
  */
 
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include "glib.h"
 #include "glib-private.h"
@@ -29,6 +31,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#ifdef G_OS_UNIX
+#include <sys/utsname.h>
+#endif
 #ifdef G_OS_WIN32
 #include <windows.h>
 #endif
@@ -517,6 +522,39 @@ test_desktop_special_dir (void)
   g_assert (dir2 != NULL);
 }
 
+static void
+test_os_info (void)
+{
+  gchar *name;
+  gchar *contents = NULL;
+#ifdef G_OS_UNIX
+  struct utsname info;
+#endif
+
+  /* Whether this is implemented or not, it must not crash */
+  name = g_get_os_info (G_OS_INFO_KEY_NAME);
+  g_test_message ("%s: %s",
+                  G_OS_INFO_KEY_NAME,
+                  name == NULL ? "(null)" : name);
+
+#if defined (G_OS_WIN32) || defined (__APPLE__)
+  /* These OSs have a special case so NAME should always succeed */
+  g_assert_nonnull (name);
+#elif defined (G_OS_UNIX)
+  if (g_file_get_contents ("/etc/os-release", &contents, NULL, NULL) ||
+      g_file_get_contents ("/usr/lib/os-release", &contents, NULL, NULL) ||
+      uname (&info) == 0)
+    g_assert_nonnull (name);
+  else
+    g_test_skip ("os-release(5) API not implemented on this platform");
+#else
+  g_test_skip ("g_get_os_info() not supported on this platform");
+#endif
+
+  g_free (name);
+  g_free (contents);
+}
+
 static gboolean
 source_test (gpointer data)
 {
@@ -724,6 +762,54 @@ test_int_limits (void)
   g_free (str);
 }
 
+static void
+test_clear_list (void)
+{
+    GList *list = NULL;
+
+    g_clear_list (&list, NULL);
+    g_assert_null (list);
+
+    list = g_list_prepend (list, "test");
+    g_assert_nonnull (list);
+
+    g_clear_list (&list, NULL);
+    g_assert_null (list);
+
+    g_clear_list (&list, g_free);
+    g_assert_null (list);
+
+    list = g_list_prepend (list, g_malloc (16));
+    g_assert_nonnull (list);
+
+    g_clear_list (&list, g_free);
+    g_assert_null (list);
+}
+
+static void
+test_clear_slist (void)
+{
+    GSList *slist = NULL;
+
+    g_clear_slist (&slist, NULL);
+    g_assert_null (slist);
+
+    slist = g_slist_prepend (slist, "test");
+    g_assert_nonnull (slist);
+
+    g_clear_slist (&slist, NULL);
+    g_assert_null (slist);
+
+    g_clear_slist (&slist, g_free);
+    g_assert_null (slist);
+
+    slist = g_slist_prepend (slist, g_malloc (16));
+    g_assert_nonnull (slist);
+
+    g_clear_slist (&slist, g_free);
+    g_assert_null (slist);
+}
+
 int
 main (int   argc,
       char *argv[])
@@ -767,6 +853,7 @@ main (int   argc,
 #endif
   g_test_add_func ("/utils/specialdir", test_special_dir);
   g_test_add_func ("/utils/specialdir/desktop", test_desktop_special_dir);
+  g_test_add_func ("/utils/os-info", test_os_info);
   g_test_add_func ("/utils/clear-pointer", test_clear_pointer);
   g_test_add_func ("/utils/clear-pointer-cast", test_clear_pointer_cast);
   g_test_add_func ("/utils/clear-pointer/side-effects", test_clear_pointer_side_effects);
@@ -777,6 +864,8 @@ main (int   argc,
   g_test_add_func ("/utils/atexit", test_atexit);
   g_test_add_func ("/utils/check-setuid", test_check_setuid);
   g_test_add_func ("/utils/int-limits", test_int_limits);
+  g_test_add_func ("/utils/clear-list", test_clear_list);
+  g_test_add_func ("/utils/clear-slist", test_clear_slist);
 
   return g_test_run ();
 }
