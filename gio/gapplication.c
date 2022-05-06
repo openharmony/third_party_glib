@@ -70,7 +70,7 @@
  * arguments are passed through platform communication to the already
  * running program. The already running instance of the program is
  * called the "primary instance"; for non-unique applications this is
- * the always the current instance. On Linux, the D-Bus session bus
+ * always the current instance. On Linux, the D-Bus session bus
  * is used for communication.
  *
  * The use of #GApplication differs from some other commonly-used
@@ -129,7 +129,7 @@
  * initialization for all of these in a single place.
  *
  * Regardless of which of these entry points is used to start the
- * application, GApplication passes some "platform data from the
+ * application, GApplication passes some ‘platform data’ from the
  * launching instance to the primary instance, in the form of a
  * #GVariant dictionary mapping strings to variants. To use platform
  * data, override the @before_emit or @after_emit virtual functions
@@ -542,7 +542,7 @@ g_application_parse_command_line (GApplication   *application,
     {
       GOptionEntry entries[] = {
         { "gapplication-service", '\0', 0, G_OPTION_ARG_NONE, &become_service,
-          N_("Enter GApplication service mode (use from D-Bus service files)") },
+          N_("Enter GApplication service mode (use from D-Bus service files)"), NULL },
         { NULL }
       };
 
@@ -554,7 +554,7 @@ g_application_parse_command_line (GApplication   *application,
     {
       GOptionEntry entries[] = {
         { "gapplication-app-id", '\0', 0, G_OPTION_ARG_STRING, &app_id,
-          N_("Override the application’s ID") },
+          N_("Override the application’s ID"), NULL },
         { NULL }
       };
 
@@ -566,7 +566,7 @@ g_application_parse_command_line (GApplication   *application,
     {
       GOptionEntry entries[] = {
         { "gapplication-replace", '\0', 0, G_OPTION_ARG_NONE, &replace,
-          N_("Replace the running instance") },
+          N_("Replace the running instance"), NULL },
         { NULL }
       };
 
@@ -701,14 +701,14 @@ add_packed_option (GApplication *application,
  *
  * It is important to use the proper GVariant format when retrieving
  * the options with g_variant_dict_lookup():
- * - for %G_OPTION_ARG_NONE, use b
- * - for %G_OPTION_ARG_STRING, use &s
- * - for %G_OPTION_ARG_INT, use i
- * - for %G_OPTION_ARG_INT64, use x
- * - for %G_OPTION_ARG_DOUBLE, use d
- * - for %G_OPTION_ARG_FILENAME, use ^ay
- * - for %G_OPTION_ARG_STRING_ARRAY, use &as
- * - for %G_OPTION_ARG_FILENAME_ARRAY, use ^aay
+ * - for %G_OPTION_ARG_NONE, use `b`
+ * - for %G_OPTION_ARG_STRING, use `&s`
+ * - for %G_OPTION_ARG_INT, use `i`
+ * - for %G_OPTION_ARG_INT64, use `x`
+ * - for %G_OPTION_ARG_DOUBLE, use `d`
+ * - for %G_OPTION_ARG_FILENAME, use `^&ay`
+ * - for %G_OPTION_ARG_STRING_ARRAY, use `^a&s`
+ * - for %G_OPTION_ARG_FILENAME_ARRAY, use `^a&ay`
  *
  * Since: 2.40
  */
@@ -1091,6 +1091,7 @@ g_application_real_local_command_line (GApplication   *application,
   if (!options)
     {
       g_printerr ("%s\n", error->message);
+      g_error_free (error);
       *exit_status = 1;
       return TRUE;
     }
@@ -1793,7 +1794,7 @@ g_application_new (const gchar       *application_id,
  *
  * Gets the unique identifier for @application.
  *
- * Returns: the identifier for @application, owned by @application
+ * Returns: (nullable): the identifier for @application, owned by @application
  *
  * Since: 2.28
  **/
@@ -2084,7 +2085,7 @@ g_application_get_is_remote (GApplication *application)
  * This function must not be called before the application has been
  * registered.  See g_application_get_is_registered().
  *
- * Returns: (transfer none): a #GDBusConnection, or %NULL
+ * Returns: (nullable) (transfer none): a #GDBusConnection, or %NULL
  *
  * Since: 2.34
  **/
@@ -2116,7 +2117,7 @@ g_application_get_dbus_connection (GApplication *application)
  * This function must not be called before the application has been
  * registered.  See g_application_get_is_registered().
  *
- * Returns: the object path, or %NULL
+ * Returns: (nullable): the object path, or %NULL
  *
  * Since: 2.34
  **/
@@ -2743,7 +2744,7 @@ static GApplication *default_app;
  *
  * If there is no default application then %NULL is returned.
  *
- * Returns: (transfer none): the default application for this process, or %NULL
+ * Returns: (nullable) (transfer none): the default application for this process, or %NULL
  *
  * Since: 2.32
  **/
@@ -2870,7 +2871,7 @@ g_application_unmark_busy (GApplication *application)
  * Gets the application's current busy state, as set through
  * g_application_mark_busy() or g_application_bind_busy_property().
  *
- * Returns: %TRUE if @application is currenty marked as busy
+ * Returns: %TRUE if @application is currently marked as busy
  *
  * Since: 2.44
  */

@@ -303,7 +303,7 @@ test_extra_getters (void)
   g_assert_cmpstr (s, ==, "Bratwurst");
   g_free (s);
 
-  g_setenv ("LANGUAGE", "sv_SV.UTF8", TRUE);
+  g_setenv ("LANGUAGE", "sv_SE.UTF8", TRUE);
   setlocale (LC_ALL, "");
 
   s = g_desktop_app_info_get_locale_string (appinfo, "X-JunkFood");
@@ -350,6 +350,7 @@ wait_for_file (const gchar *want_this,
 static void
 test_actions (void)
 {
+  const char *expected[] = { "frob", "tweak", "twiddle", "broken", NULL };
   const gchar * const *actions;
   GDesktopAppInfo *appinfo;
   gchar *name;
@@ -358,11 +359,7 @@ test_actions (void)
   g_assert_nonnull (appinfo);
 
   actions = g_desktop_app_info_list_actions (appinfo);
-  g_assert_cmpstr (actions[0], ==, "frob");
-  g_assert_cmpstr (actions[1], ==, "tweak");
-  g_assert_cmpstr (actions[2], ==, "twiddle");
-  g_assert_cmpstr (actions[3], ==, "broken");
-  g_assert_cmpstr (actions[4], ==, NULL);
+  g_assert_cmpstrv (actions, expected);
 
   name = g_desktop_app_info_get_action_name (appinfo, "frob");
   g_assert_cmpstr (name, ==, "Frobnicate");
@@ -571,7 +568,8 @@ assert_implementations (const gchar *interface,
                       "gnome-terminal.desktop nautilus-autorun-software.desktop gcr-viewer.desktop "         \
                       "nautilus-connect-server.desktop kde4-dolphin.desktop gnome-music.desktop "            \
                       "kde4-konqbrowser.desktop gucharmap.desktop kde4-okular.desktop nautilus.desktop "     \
-                      "gedit.desktop evince.desktop file-roller.desktop dconf-editor.desktop glade.desktop"
+                      "gedit.desktop evince.desktop file-roller.desktop dconf-editor.desktop glade.desktop " \
+                      "invalid-desktop.desktop"
 #define HOME_APPS     "epiphany-weather-for-toronto-island-9c6a4e022b17686306243dada811d550d25eb1fb.desktop"
 #define ALL_HOME_APPS HOME_APPS " eog.desktop"
 
@@ -726,6 +724,9 @@ test_show_in (void)
   assert_shown ("gcr-prompter.desktop", TRUE, "GNOME-Classic");
   assert_shown ("gcr-prompter.desktop", TRUE, "GNOME-Classic:KDE");
   assert_shown ("gcr-prompter.desktop", TRUE, "KDE:GNOME-Classic");
+  assert_shown ("invalid-desktop.desktop", TRUE, "GNOME");
+  assert_shown ("invalid-desktop.desktop", FALSE, "../invalid/desktop");
+  assert_shown ("invalid-desktop.desktop", FALSE, "../invalid/desktop:../invalid/desktop");
 }
 
 /* Test g_desktop_app_info_launch_uris_as_manager() and

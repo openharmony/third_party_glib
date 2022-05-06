@@ -30,8 +30,8 @@ option('xattr',
        description : 'build with xattr support')
 
 option('libmount',
-       type : 'boolean',
-       value : true,
+       type : 'feature',
+       value : 'auto',
        description : 'build with libmount support')
 
 option('internal_pcre',
@@ -59,6 +59,11 @@ option('tapset_install_dir',
        value : '',
        description : 'path where systemtap tapsets are installed')
 
+option('sysprof',
+       type : 'feature',
+       value : 'disabled',
+       description : 'include tracing support for sysprof')
+
 option('gtk_doc',
        type : 'boolean',
        value : false,
@@ -79,6 +84,11 @@ option('fam',
        value : false,
        description : 'Use fam for file system monitoring')
 
+option('tests',
+       type : 'boolean',
+       value : true,
+       description : 'build tests')
+
 option('installed_tests',
        type : 'boolean',
        value : false,
@@ -94,3 +104,26 @@ option('oss_fuzz',
        type : 'feature',
        value : 'disabled',
        description : 'Indicate oss-fuzz build environment')
+
+option('glib_debug',
+       type : 'feature',
+       value : 'auto',
+       yield : true,
+       description : 'Enable GLib debug infrastructure (see docs/macros.txt)')
+
+option('glib_assert',
+       type : 'boolean',
+       value : true,
+       yield : true,
+       description : 'Enable GLib assertion (see docs/macros.txt)')
+
+option('glib_checks',
+       type : 'boolean',
+       value : true,
+       yield : true,
+       description : 'Enable GLib checks such as API guards (see docs/macros.txt)')
+
+option('libelf',
+       type : 'feature',
+       value : 'auto',
+       description : 'Enable support for listing and extracting from ELF resource files with gresource tool')

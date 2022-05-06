@@ -21,13 +21,15 @@
  */
 
 /* We are testing some deprecated APIs here */
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include <glib.h>
 
 static GCond cond;
 static GMutex mutex;
-static volatile gint next;
+static gint next;  /* locked by @mutex */
 
 static void
 push_value (gint value)

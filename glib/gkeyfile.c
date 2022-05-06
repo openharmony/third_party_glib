@@ -510,9 +510,10 @@ struct _GKeyFile
 
   GKeyFileFlags flags;
 
+  gboolean checked_locales;
   gchar **locales;
 
-  volatile gint ref_count;
+  gint ref_count;  /* (atomic) */
 };
 
 typedef struct _GKeyFileKeyValuePair GKeyFileKeyValuePair;
@@ -630,12 +631,11 @@ g_key_file_init (GKeyFile *key_file)
 {  
   key_file->current_group = g_slice_new0 (GKeyFileGroup);
   key_file->groups = g_list_prepend (NULL, key_file->current_group);
-  key_file->group_hash = g_hash_table_new (g_str_hash, g_str_equal);
+  key_file->group_hash = NULL;
   key_file->start_group = NULL;
-  key_file->parse_buffer = g_string_sized_new (128);
+  key_file->parse_buffer = NULL;
   key_file->list_separator = ';';
   key_file->flags = 0;
-  key_file->locales = g_strdupv ((gchar **)g_get_language_names ());
 }
 
 static void
@@ -648,6 +648,7 @@ g_key_file_clear (GKeyFile *key_file)
       g_strfreev (key_file->locales);
       key_file->locales = NULL;
     }
+  key_file->checked_locales = FALSE;
 
   if (key_file->parse_buffer)
     {
@@ -1113,7 +1114,7 @@ g_key_file_load_from_dirs (GKeyFile       *key_file,
  * @full_path.  If the file could not be loaded then an %error is
  * set to either a #GFileError or #GKeyFileError.
  *
- * Returns: %TRUE if a key file could be loaded, %FALSE othewise
+ * Returns: %TRUE if a key file could be loaded, %FALSE otherwise
  * Since: 2.6
  **/
 gboolean
@@ -1231,6 +1232,12 @@ g_key_file_locale_is_interesting (GKeyFile    *key_file,
 
   if (key_file->flags & G_KEY_FILE_KEEP_TRANSLATIONS)
     return TRUE;
+
+  if (!key_file->checked_locales)
+    {
+      key_file->locales = g_strdupv ((gchar **)g_get_language_names ());
+      key_file->checked_locales = TRUE;
+    }
 
   for (i = 0; key_file->locales[i] != NULL; i++)
     {
@@ -1467,6 +1474,9 @@ g_key_file_parse_data (GKeyFile     *key_file,
 
   parse_error = NULL;
 
+  if (!key_file->parse_buffer)
+    key_file->parse_buffer = g_string_sized_new (128);
+
   i = 0;
   while (i < length)
     {
@@ -1522,6 +1532,9 @@ g_key_file_flush_parse_buffer (GKeyFile  *key_file,
   GError *file_error = NULL;
 
   g_return_if_fail (key_file != NULL);
+
+  if (!key_file->parse_buffer)
+    return;
 
   file_error = NULL;
 
@@ -1693,7 +1706,7 @@ g_key_file_get_keys (GKeyFile     *key_file,
  *
  * Returns the name of the start group of the file. 
  *
- * Returns: The start group of the key file.
+ * Returns: (nullable): The start group of the key file.
  *
  * Since: 2.6
  **/
@@ -3317,6 +3330,7 @@ g_key_file_set_key_comment (GKeyFile     *key_file,
   pair->value = g_key_file_parse_comment_as_value (key_file, comment);
   
   key_node = g_list_insert (key_node, pair, 1);
+  (void) key_node;
 
   return TRUE;
 }
@@ -3486,7 +3500,7 @@ g_key_file_get_key_comment (GKeyFile     *key_file,
   string = NULL;
 
   /* Then find all the comments already associated with the
-   * key and concatentate them.
+   * key and concatenate them.
    */
   tmp = key_node->next;
   if (!key_node->next)
@@ -3635,7 +3649,7 @@ g_key_file_get_top_comment (GKeyFile  *key_file,
  * g_key_file_get_comment:
  * @key_file: a #GKeyFile
  * @group_name: (nullable): a group name, or %NULL
- * @key: a key
+ * @key: (nullable): a key
  * @error: return location for a #GError
  *
  * Retrieves a comment above @key from @group_name.
@@ -3824,6 +3838,9 @@ g_key_file_add_group (GKeyFile    *key_file,
   if (key_file->start_group == NULL)
     key_file->start_group = group;
 
+  if (!key_file->group_hash)
+    key_file->group_hash = g_hash_table_new (g_str_hash, g_str_equal);
+
   g_hash_table_insert (key_file->group_hash, (gpointer)group->name, group);
 }
 
@@ -3876,7 +3893,10 @@ g_key_file_remove_group_node (GKeyFile *key_file,
   group = (GKeyFileGroup *) group_node->data;
 
   if (group->name)
-    g_hash_table_remove (key_file->group_hash, group->name);
+    {
+      g_assert (key_file->group_hash);
+      g_hash_table_remove (key_file->group_hash, group->name);
+    }
 
   /* If the current group gets deleted make the current group the last
    * added group.
@@ -4082,6 +4102,9 @@ static GKeyFileGroup *
 g_key_file_lookup_group (GKeyFile    *key_file,
 			 const gchar *group_name)
 {
+  if (!key_file->group_hash)
+    return NULL;
+
   return (GKeyFileGroup *)g_hash_table_lookup (key_file->group_hash, group_name);
 }
 
@@ -4610,7 +4633,9 @@ g_key_file_parse_comment_as_value (GKeyFile      *key_file,
  * @error: a pointer to a %NULL #GError, or %NULL
  *
  * Writes the contents of @key_file to @filename using
- * g_file_set_contents().
+ * g_file_set_contents(). If you need stricter guarantees about durability of
+ * the written file than are provided by g_file_set_contents(), use
+ * g_file_set_contents_full() with the return value of g_key_file_to_data().
  *
  * This function can fail for any of the reasons that
  * g_file_set_contents() may fail.

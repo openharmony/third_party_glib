@@ -186,7 +186,7 @@ G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_SOFT     == PCRE_PARTIAL_SOFT);
 G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_HARD     == PCRE_PARTIAL_HARD);
 G_STATIC_ASSERT (G_REGEX_MATCH_NOTEMPTY_ATSTART == PCRE_NOTEMPTY_ATSTART);
 
-/* These PCRE flags are unused or not exposed publically in GRegexFlags, so
+/* These PCRE flags are unused or not exposed publicly in GRegexFlags, so
  * it should be ok to reuse them for different things.
  */
 G_STATIC_ASSERT (G_REGEX_OPTIMIZE          == PCRE_NO_UTF8_CHECK);
@@ -203,7 +203,7 @@ G_STATIC_ASSERT (G_REGEX_RAW               == PCRE_UTF8);
 
 struct _GMatchInfo
 {
-  volatile gint ref_count;      /* the ref count */
+  gint ref_count;               /* the ref count (atomic) */
   GRegex *regex;                /* the regex */
   GRegexMatchFlags match_opts;  /* options used at match time on the regex */
   gint matches;                 /* number of matching sub patterns */
@@ -218,7 +218,7 @@ struct _GMatchInfo
 
 struct _GRegex
 {
-  volatile gint ref_count;      /* the ref count for the immutable part */
+  gint ref_count;               /* the ref count for the immutable part (atomic) */
   gchar *pattern;               /* the pattern */
   pcre *pcre_re;                /* compiled form of the pattern */
   GRegexCompileFlags compile_opts;      /* options used at compile time on the pattern */
@@ -1285,7 +1285,7 @@ static pcre *regex_compile (const gchar         *pattern,
  * Compiles the regular expression to an internal form, and does
  * the initial setup of the #GRegex structure.
  *
- * Returns: (nullable): a #GRegex structure or %NULL if an error occured. Call
+ * Returns: (nullable): a #GRegex structure or %NULL if an error occurred. Call
  *   g_regex_unref() when you are done with it
  *
  * Since: 2.14
@@ -1300,7 +1300,7 @@ g_regex_new (const gchar         *pattern,
   pcre *re;
   const gchar *errmsg;
   gboolean optimize = FALSE;
-  static volatile gsize initialised = 0;
+  static gsize initialised = 0;
 
   g_return_val_if_fail (pattern != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -2785,7 +2785,7 @@ interpolation_list_needs_match (GList *list)
  * If you do not need to use backreferences use g_regex_replace_literal().
  *
  * The @replacement string must be UTF-8 encoded even if #G_REGEX_RAW was
- * passed to g_regex_new(). If you want to use not UTF-8 encoded stings
+ * passed to g_regex_new(). If you want to use not UTF-8 encoded strings
  * you can use g_regex_replace_literal().
  *
  * Setting @start_position differs from just passing over a shortened

@@ -1,4 +1,5 @@
 if get_option('gtk_doc')
+  subdir('gdbus-object-manager-example')
   subdir('xml')
 
   ignore_headers = [
@@ -50,6 +51,8 @@ if get_option('gtk_doc')
     'glocalfilemonitor.h',
     'glocalfileoutputstream.h',
     'glocalvfs.h',
+    'gmemorymonitordbus.h',
+    'gmemorymonitorportal.h',
     'gmountprivate.h',
     'gnativevolumemonitor.h',
     'gnetworkingprivate.h',
@@ -82,8 +85,15 @@ if get_option('gtk_doc')
     'gunixvolume.h',
     'gunixvolumemonitor.h',
     'gwin32networkmonitor.h',
+    'gwin32api-application-activation-manager.h',
+    'gwin32api-iterator.h',
+    'gwin32api-misc.h',
+    'gwin32api-package.h',
+    'gwin32api-storage.h',
     'gwin32appinfo.h',
+    'gwin32file-sync-stream.h',
     'gwin32mount.h',
+    'gwin32packageparser.h',
     'gwin32resolver.h',
     'gwin32volumemonitor.h',
     'thumbnail-verify.h',
@@ -130,8 +140,6 @@ if get_option('gtk_doc')
     'xdp-dbus.c',
   ]
 
-  # FIXME: ExampleAnimal docs aren't built
-
   docpath = join_paths(glib_datadir, 'gtk-doc', 'html')
   version_conf = configuration_data()
   version_conf.set('VERSION', meson.project_version())
@@ -159,6 +167,28 @@ if get_option('gtk_doc')
     copy : true,
   )
 
+  content_files = [
+    'overview.xml',
+    'migrating-posix.xml',
+    'migrating-gnome-vfs.xml',
+    'migrating-gconf.xml',
+    'migrating-gdbus.xml',
+    'gio-querymodules.xml',
+    'glib-compile-schemas.xml',
+    'glib-compile-resources.xml',
+    'gapplication.xml',
+    'gsettings.xml',
+    'gresource.xml',
+    'gdbus.xml',
+    'gdbus-codegen.xml',
+  ]
+
+  content_files += [
+    gdbus_example_objectmanager_xml,
+    gdbus_example_objectmanager_sources,
+    gdbus_object_manager_example_doc
+  ]
+
   gnome.gtkdoc('gio',
     main_xml : 'gio-docs.xml',
     namespace : 'g',
@@ -172,21 +202,7 @@ if get_option('gtk_doc')
     mkdb_args : [
       '--ignore-files=' + ' '.join(ignore_sources),
     ],
-    content_files : [
-      'overview.xml',
-      'migrating-posix.xml',
-      'migrating-gnome-vfs.xml',
-      'migrating-gconf.xml',
-      'migrating-gdbus.xml',
-      'gio-querymodules.xml',
-      'glib-compile-schemas.xml',
-      'glib-compile-resources.xml',
-      'gapplication.xml',
-      'gsettings.xml',
-      'gresource.xml',
-      'gdbus.xml',
-      'gdbus-codegen.xml',
-    ],
+    content_files : content_files,
     expand_content_files : [
       'overview.xml',
       'migrating-posix.xml',
@@ -205,7 +221,8 @@ if get_option('gtk_doc')
       '--extra-dir=' + join_paths('gio', '..', 'glib', 'html'),
       '--extra-dir=' + join_paths('gio', '..', 'gobject', 'html'),
     ],
-    install: true
+    install: true,
+    check: true,
   )
 endif
 

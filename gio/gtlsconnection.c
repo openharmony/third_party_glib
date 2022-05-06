@@ -139,9 +139,10 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
 							 TRUE,
 							 G_PARAM_READWRITE |
 							 G_PARAM_CONSTRUCT |
-							 G_PARAM_STATIC_STRINGS));
+							 G_PARAM_STATIC_STRINGS |
+							 G_PARAM_DEPRECATED));
   /**
-   * GTlsConnection:database:
+   * GTlsConnection:database: (nullable)
    *
    * The certificate database to use when verifying this TLS connection.
    * If no certificate database is set, then the default database will be
@@ -157,7 +158,7 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
 							 G_PARAM_READWRITE |
 							 G_PARAM_STATIC_STRINGS));
   /**
-   * GTlsConnection:interaction:
+   * GTlsConnection:interaction: (nullable)
    *
    * A #GTlsInteraction object to be used when the connection or certificate
    * database need to interact with the user. This will be used to prompt the
@@ -195,6 +196,8 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
    * g_tls_connection_set_rehandshake_mode().
    *
    * Since: 2.28
+   *
+   * Deprecated: 2.60: The rehandshake mode is ignored.
    */
   g_object_class_install_property (gobject_class, PROP_REHANDSHAKE_MODE,
 				   g_param_spec_enum ("rehandshake-mode",
@@ -222,12 +225,11 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
 							G_PARAM_READWRITE |
 							G_PARAM_STATIC_STRINGS));
   /**
-   * GTlsConnection:peer-certificate:
+   * GTlsConnection:peer-certificate: (nullable)
    *
    * The connection's peer's certificate, after the TLS handshake has
-   * completed and the certificate has been accepted. Note in
-   * particular that this is not yet set during the emission of
-   * #GTlsConnection::accept-certificate.
+   * completed or failed. Note in particular that this is not yet set
+   * during the emission of #GTlsConnection::accept-certificate.
    *
    * (You can watch for a #GObject::notify signal on this property to
    * detect when a handshake has occurred.)
@@ -244,7 +246,7 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
   /**
    * GTlsConnection:peer-certificate-errors:
    *
-   * The errors noticed-and-ignored while verifying
+   * The errors noticed while verifying
    * #GTlsConnection:peer-certificate. Normally this should be 0, but
    * it may not be if #GTlsClientConnection:validation-flags is not
    * %G_TLS_CERTIFICATE_VALIDATE_ALL, or if
@@ -262,7 +264,7 @@ g_tls_connection_class_init (GTlsConnectionClass *klass)
 						       G_PARAM_READABLE |
 						       G_PARAM_STATIC_STRINGS));
   /**
-   * GTlsConnection:advertised-protocols:
+   * GTlsConnection:advertised-protocols: (nullable)
    *
    * The list of application-layer protocols that the connection
    * advertises that it is willing to speak. See
@@ -442,7 +444,7 @@ g_tls_connection_get_use_system_certdb (GTlsConnection *conn)
 /**
  * g_tls_connection_set_database:
  * @conn: a #GTlsConnection
- * @database: a #GTlsDatabase
+ * @database: (nullable): a #GTlsDatabase
  *
  * Sets the certificate database that is used to verify peer certificates.
  * This is set to the default database by default. See
@@ -474,7 +476,7 @@ g_tls_connection_set_database (GTlsConnection *conn,
  * Gets the certificate database that @conn uses to verify
  * peer certificates. See g_tls_connection_set_database().
  *
- * Returns: (transfer none): the certificate database that @conn uses or %NULL
+ * Returns: (transfer none) (nullable): the certificate database that @conn uses or %NULL
  *
  * Since: 2.30
  */
@@ -536,7 +538,7 @@ g_tls_connection_set_certificate (GTlsConnection  *conn,
  * Gets @conn's certificate, as set by
  * g_tls_connection_set_certificate().
  *
- * Returns: (transfer none): @conn's certificate, or %NULL
+ * Returns: (transfer none) (nullable): @conn's certificate, or %NULL
  *
  * Since: 2.28
  */
@@ -586,7 +588,7 @@ g_tls_connection_set_interaction (GTlsConnection       *conn,
  * for things like prompting the user for passwords. If %NULL is returned, then
  * no user interaction will occur for this connection.
  *
- * Returns: (transfer none): The interaction object.
+ * Returns: (transfer none) (nullable): The interaction object.
  *
  * Since: 2.30
  */
@@ -608,11 +610,11 @@ g_tls_connection_get_interaction (GTlsConnection       *conn)
  * g_tls_connection_get_peer_certificate:
  * @conn: a #GTlsConnection
  *
- * Gets @conn's peer's certificate after the handshake has completed.
- * (It is not set during the emission of
+ * Gets @conn's peer's certificate after the handshake has completed
+ * or failed. (It is not set during the emission of
  * #GTlsConnection::accept-certificate.)
  *
- * Returns: (transfer none): @conn's peer's certificate, or %NULL
+ * Returns: (transfer none) (nullable): @conn's peer's certificate, or %NULL
  *
  * Since: 2.28
  */
@@ -635,8 +637,8 @@ g_tls_connection_get_peer_certificate (GTlsConnection *conn)
  * @conn: a #GTlsConnection
  *
  * Gets the errors associated with validating @conn's peer's
- * certificate, after the handshake has completed. (It is not set
- * during the emission of #GTlsConnection::accept-certificate.)
+ * certificate, after the handshake has completed or failed. (It is
+ * not set during the emission of #GTlsConnection::accept-certificate.)
  *
  * Returns: @conn's peer's certificate errors
  *
@@ -730,27 +732,10 @@ g_tls_connection_get_require_close_notify (GTlsConnection *conn)
  * @conn: a #GTlsConnection
  * @mode: the rehandshaking mode
  *
- * Sets how @conn behaves with respect to rehandshaking requests, when
- * TLS 1.2 or older is in use.
- *
- * %G_TLS_REHANDSHAKE_NEVER means that it will never agree to
- * rehandshake after the initial handshake is complete. (For a client,
- * this means it will refuse rehandshake requests from the server, and
- * for a server, this means it will close the connection with an error
- * if the client attempts to rehandshake.)
- *
- * %G_TLS_REHANDSHAKE_SAFELY means that the connection will allow a
- * rehandshake only if the other end of the connection supports the
- * TLS `renegotiation_info` extension. This is the default behavior,
- * but means that rehandshaking will not work against older
- * implementations that do not support that extension.
- *
- * %G_TLS_REHANDSHAKE_UNSAFELY means that the connection will allow
- * rehandshaking even without the `renegotiation_info` extension. On
- * the server side in particular, this is not recommended, since it
- * leaves the server open to certain attacks. However, this mode is
- * necessary if you need to allow renegotiation with older client
- * software.
+ * Since GLib 2.64, changing the rehandshake mode is no longer supported
+ * and will have no effect. With TLS 1.3, rehandshaking has been removed from
+ * the TLS protocol, replaced by separate post-handshake authentication and
+ * rekey operations.
  *
  * Since: 2.28
  *
@@ -766,7 +751,7 @@ g_tls_connection_set_rehandshake_mode (GTlsConnection       *conn,
   g_return_if_fail (G_IS_TLS_CONNECTION (conn));
 
   g_object_set (G_OBJECT (conn),
-		"rehandshake-mode", mode,
+		"rehandshake-mode", G_TLS_REHANDSHAKE_SAFELY,
 		NULL);
 }
 G_GNUC_END_IGNORE_DEPRECATIONS
@@ -778,7 +763,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
  * Gets @conn rehandshaking mode. See
  * g_tls_connection_set_rehandshake_mode() for details.
  *
- * Returns: @conn's rehandshaking mode
+ * Returns: %G_TLS_REHANDSHAKE_SAFELY
  *
  * Since: 2.28
  *
@@ -792,12 +777,15 @@ g_tls_connection_get_rehandshake_mode (GTlsConnection       *conn)
 {
   GTlsRehandshakeMode mode;
 
-  g_return_val_if_fail (G_IS_TLS_CONNECTION (conn), G_TLS_REHANDSHAKE_NEVER);
+  g_return_val_if_fail (G_IS_TLS_CONNECTION (conn), G_TLS_REHANDSHAKE_SAFELY);
 
+  /* Continue to call g_object_get(), even though the return value is
+   * ignored, so that behavior doesn’t change for derived classes.
+   */
   g_object_get (G_OBJECT (conn),
 		"rehandshake-mode", &mode,
 		NULL);
-  return mode;
+  return G_TLS_REHANDSHAKE_SAFELY;
 }
 G_GNUC_END_IGNORE_DEPRECATIONS
 
@@ -878,6 +866,66 @@ g_tls_connection_get_negotiated_protocol (GTlsConnection *conn)
 }
 
 /**
+ * g_tls_channel_binding_error_quark:
+ *
+ * Gets the TLS channel binding error quark.
+ *
+ * Returns: a #GQuark.
+ *
+ * Since: 2.66
+ */
+G_DEFINE_QUARK (g-tls-channel-binding-error-quark, g_tls_channel_binding_error)
+
+/**
+ * g_tls_connection_get_channel_binding_data:
+ * @conn: a #GTlsConnection
+ * @type: #GTlsChannelBindingType type of data to fetch
+ * @data: (out callee-allocates)(optional)(transfer none): #GByteArray is
+ *        filled with the binding data, or %NULL
+ * @error: a #GError pointer, or %NULL
+ *
+ * Query the TLS backend for TLS channel binding data of @type for @conn.
+ *
+ * This call retrieves TLS channel binding data as specified in RFC
+ * [5056](https://tools.ietf.org/html/rfc5056), RFC
+ * [5929](https://tools.ietf.org/html/rfc5929), and related RFCs.  The
+ * binding data is returned in @data.  The @data is resized by the callee
+ * using #GByteArray buffer management and will be freed when the @data
+ * is destroyed by g_byte_array_unref(). If @data is %NULL, it will only
+ * check whether TLS backend is able to fetch the data (e.g. whether @type
+ * is supported by the TLS backend). It does not guarantee that the data
+ * will be available though.  That could happen if TLS connection does not
+ * support @type or the binding data is not available yet due to additional
+ * negotiation or input required.
+ *
+ * Returns: %TRUE on success, %FALSE otherwise
+ *
+ * Since: 2.66
+ */
+gboolean
+g_tls_connection_get_channel_binding_data (GTlsConnection          *conn,
+                                           GTlsChannelBindingType   type,
+                                           GByteArray              *data,
+                                           GError                 **error)
+{
+  GTlsConnectionClass *class;
+
+  g_return_val_if_fail (G_IS_TLS_CONNECTION (conn), FALSE);
+  g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+
+  class = G_TLS_CONNECTION_GET_CLASS (conn);
+  if (class->get_binding_data == NULL)
+    {
+      g_set_error_literal (error, G_TLS_CHANNEL_BINDING_ERROR,
+          G_TLS_CHANNEL_BINDING_ERROR_NOT_IMPLEMENTED,
+          _("TLS backend does not implement TLS binding retrieval"));
+      return FALSE;
+    }
+
+  return class->get_binding_data (conn, type, data, error);
+}
+
+/**
  * g_tls_connection_handshake:
  * @conn: a #GTlsConnection
  * @cancellable: (nullable): a #GCancellable, or %NULL
@@ -887,28 +935,30 @@ g_tls_connection_get_negotiated_protocol (GTlsConnection *conn)
  *
  * On the client side, it is never necessary to call this method;
  * although the connection needs to perform a handshake after
- * connecting (or after sending a "STARTTLS"-type command) and may
- * need to rehandshake later if the server requests it,
+ * connecting (or after sending a "STARTTLS"-type command),
  * #GTlsConnection will handle this for you automatically when you try
- * to send or receive data on the connection. However, you can call
- * g_tls_connection_handshake() manually if you want to know for sure
- * whether the initial handshake succeeded or failed (as opposed to
- * just immediately trying to write to @conn's output stream, in which
- * case if it fails, it may not be possible to tell if it failed
- * before or after completing the handshake).
+ * to send or receive data on the connection. You can call
+ * g_tls_connection_handshake() manually if you want to know whether
+ * the initial handshake succeeded or failed (as opposed to just
+ * immediately trying to use @conn to read or write, in which case,
+ * if it fails, it may not be possible to tell if it failed before or
+ * after completing the handshake), but beware that servers may reject
+ * client authentication after the handshake has completed, so a
+ * successful handshake does not indicate the connection will be usable.
  *
  * Likewise, on the server side, although a handshake is necessary at
  * the beginning of the communication, you do not need to call this
  * function explicitly unless you want clearer error reporting.
  *
- * If TLS 1.2 or older is in use, you may call
- * g_tls_connection_handshake() after the initial handshake to
- * rehandshake; however, this usage is deprecated because rehandshaking
- * is no longer part of the TLS protocol in TLS 1.3. Accordingly, the
- * behavior of calling this function after the initial handshake is now
- * undefined, except it is guaranteed to be reasonable and
- * nondestructive so as to preserve compatibility with code written for
- * older versions of GLib.
+ * Previously, calling g_tls_connection_handshake() after the initial
+ * handshake would trigger a rehandshake; however, this usage was
+ * deprecated in GLib 2.60 because rehandshaking was removed from the
+ * TLS protocol in TLS 1.3. Since GLib 2.64, calling this function after
+ * the initial handshake will no longer do anything.
+ *
+ * When using a #GTlsConnection created by #GSocketClient, the
+ * #GSocketClient performs the initial handshake, so calling this
+ * function manually is not recommended.
  *
  * #GTlsConnection::accept_certificate may be emitted during the
  * handshake.

@@ -18,6 +18,11 @@
  * Author: Alexander Larsson <alexl@redhat.com>
  */
 
+/* Needed for the statx() calls in inline functions in glocalfileinfo.h */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "config.h"
 
 #include <sys/types.h>
@@ -230,9 +235,9 @@ g_local_file_output_stream_write (GOutputStream  *stream,
 #ifdef G_OS_UNIX
 /* Macro to check if struct iovec and GOutputVector have the same ABI */
 #define G_OUTPUT_VECTOR_IS_IOVEC (sizeof (struct iovec) == sizeof (GOutputVector) && \
-      sizeof ((struct iovec *) 0)->iov_base == sizeof ((GOutputVector *) 0)->buffer && \
+      G_SIZEOF_MEMBER (struct iovec, iov_base) == G_SIZEOF_MEMBER (GOutputVector, buffer) && \
       G_STRUCT_OFFSET (struct iovec, iov_base) == G_STRUCT_OFFSET (GOutputVector, buffer) && \
-      sizeof ((struct iovec *) 0)->iov_len == sizeof((GOutputVector *) 0)->size && \
+      G_SIZEOF_MEMBER (struct iovec, iov_len) == G_SIZEOF_MEMBER (GOutputVector, size) && \
       G_STRUCT_OFFSET (struct iovec, iov_len) == G_STRUCT_OFFSET (GOutputVector, size))
 
 static gboolean
@@ -319,9 +324,8 @@ _g_local_file_output_stream_really_close (GLocalFileOutputStream *file,
 {
   GLocalFileStat final_stat;
 
-#ifdef HAVE_FSYNC
   if (file->priv->sync_on_close &&
-      fsync (file->priv->fd) != 0)
+      g_fsync (file->priv->fd) != 0)
     {
       int errsv = errno;
       
@@ -331,8 +335,7 @@ _g_local_file_output_stream_really_close (GLocalFileOutputStream *file,
 		   g_strerror (errsv));
       goto err_out;
     }
-#endif
- 
+
 #ifdef G_OS_WIN32
 
   /* Must close before renaming on Windows, so just do the close first
@@ -432,7 +435,7 @@ _g_local_file_output_stream_really_close (GLocalFileOutputStream *file,
       
 #ifndef G_OS_WIN32		/* Already did the fstat() and close() above on Win32 */
 
-  if (fstat (file->priv->fd, &final_stat) == 0)
+  if (g_local_file_fstat (file->priv->fd, G_LOCAL_FILE_STAT_FIELD_MTIME, G_LOCAL_FILE_STAT_FIELD_ALL, &final_stat) == 0)
     file->priv->etag = _g_local_file_info_create_etag (&final_stat);
 
   if (!g_close (file->priv->fd, NULL))
@@ -906,16 +909,31 @@ handle_overwrite_open (const char    *filename,
       g_free (display_name);
       return -1;
     }
-  
-#ifdef G_OS_WIN32
-  res = GLIB_PRIVATE_CALL (g_win32_fstat) (fd, &original_stat);
-#else
+
   if (!is_symlink)
-    res = fstat (fd, &original_stat);
+    {
+      res = g_local_file_fstat (fd,
+                                G_LOCAL_FILE_STAT_FIELD_TYPE |
+                                G_LOCAL_FILE_STAT_FIELD_MODE |
+                                G_LOCAL_FILE_STAT_FIELD_UID |
+                                G_LOCAL_FILE_STAT_FIELD_GID |
+                                G_LOCAL_FILE_STAT_FIELD_MTIME |
+                                G_LOCAL_FILE_STAT_FIELD_NLINK,
+                                G_LOCAL_FILE_STAT_FIELD_ALL, &original_stat);
+      errsv = errno;
+    }
   else
-    res = lstat (filename, &original_stat);
-#endif
-  errsv = errno;
+    {
+      res = g_local_file_lstat (filename,
+                                G_LOCAL_FILE_STAT_FIELD_TYPE |
+                                G_LOCAL_FILE_STAT_FIELD_MODE |
+                                G_LOCAL_FILE_STAT_FIELD_UID |
+                                G_LOCAL_FILE_STAT_FIELD_GID |
+                                G_LOCAL_FILE_STAT_FIELD_MTIME |
+                                G_LOCAL_FILE_STAT_FIELD_NLINK,
+                                G_LOCAL_FILE_STAT_FIELD_ALL, &original_stat);
+      errsv = errno;
+    }
 
   if (res != 0)
     {
@@ -929,9 +947,9 @@ handle_overwrite_open (const char    *filename,
     }
   
   /* not a regular file */
-  if (!S_ISREG (original_stat.st_mode))
+  if (!S_ISREG (_g_stat_mode (&original_stat)))
     {
-      if (S_ISDIR (original_stat.st_mode))
+      if (S_ISDIR (_g_stat_mode (&original_stat)))
         {
           g_set_error_literal (error,
                                G_IO_ERROR,
@@ -941,7 +959,7 @@ handle_overwrite_open (const char    *filename,
         }
       else if (!is_symlink ||
 #ifdef S_ISLNK
-               !S_ISLNK (original_stat.st_mode)
+               !S_ISLNK (_g_stat_mode (&original_stat))
 #else
                FALSE
 #endif
@@ -965,7 +983,7 @@ handle_overwrite_open (const char    *filename,
                                G_IO_ERROR_WRONG_ETAG,
                                _("The file was externally modified"));
 	  g_free (current_etag);
-	  goto error;
+          goto error;
 	}
       g_free (current_etag);
     }
@@ -982,7 +1000,7 @@ handle_overwrite_open (const char    *filename,
    */
   
   if (replace_destination_set ||
-      (!(original_stat.st_nlink > 1) && !is_symlink))
+      (!(_g_stat_nlink (&original_stat) > 1) && !is_symlink))
     {
       char *dirname, *tmp_filename;
       int tmpfd;
@@ -1003,10 +1021,10 @@ handle_overwrite_open (const char    *filename,
       if (!replace_destination_set &&
 	   (
 #ifdef HAVE_FCHOWN
-	    fchown (tmpfd, original_stat.st_uid, original_stat.st_gid) == -1 ||
+	    fchown (tmpfd, _g_stat_uid (&original_stat), _g_stat_gid (&original_stat)) == -1 ||
 #endif
 #ifdef HAVE_FCHMOD
-	    fchmod (tmpfd, original_stat.st_mode) == -1 ||
+	    fchmod (tmpfd, _g_stat_mode (&original_stat) & ~S_IFMT) == -1 ||
 #endif
 	    0
 	    )
@@ -1015,16 +1033,18 @@ handle_overwrite_open (const char    *filename,
           GLocalFileStat tmp_statbuf;
           int tres;
 
-#ifdef G_OS_WIN32
-          tres = GLIB_PRIVATE_CALL (g_win32_fstat) (tmpfd, &tmp_statbuf);
-#else
-          tres = fstat (tmpfd, &tmp_statbuf);
-#endif
+          tres = g_local_file_fstat (tmpfd,
+                                     G_LOCAL_FILE_STAT_FIELD_TYPE |
+                                     G_LOCAL_FILE_STAT_FIELD_MODE |
+                                     G_LOCAL_FILE_STAT_FIELD_UID |
+                                     G_LOCAL_FILE_STAT_FIELD_GID,
+                                     G_LOCAL_FILE_STAT_FIELD_ALL, &tmp_statbuf);
+
 	  /* Check that we really needed to change something */
 	  if (tres != 0 ||
-	      original_stat.st_uid != tmp_statbuf.st_uid ||
-	      original_stat.st_gid != tmp_statbuf.st_gid ||
-	      original_stat.st_mode != tmp_statbuf.st_mode)
+	      _g_stat_uid (&original_stat) != _g_stat_uid (&tmp_statbuf) ||
+	      _g_stat_gid (&original_stat) != _g_stat_gid (&tmp_statbuf) ||
+	      _g_stat_mode (&original_stat) != _g_stat_mode (&tmp_statbuf))
 	    {
 	      g_close (tmpfd, NULL);
 	      g_unlink (tmp_filename);
@@ -1044,7 +1064,7 @@ handle_overwrite_open (const char    *filename,
   if (create_backup)
     {
 #if defined(HAVE_FCHOWN) && defined(HAVE_FCHMOD)
-      struct stat tmp_statbuf;      
+      GLocalFileStat tmp_statbuf;
 #endif
       char *backup_filename;
       int bfd;
@@ -1058,12 +1078,12 @@ handle_overwrite_open (const char    *filename,
                                G_IO_ERROR_CANT_CREATE_BACKUP,
                                _("Backup file creation failed"));
 	  g_free (backup_filename);
-	  goto error;
+          goto error;
 	}
 
       bfd = g_open (backup_filename,
 		    O_WRONLY | O_CREAT | O_EXCL | O_BINARY,
-		    original_stat.st_mode & 0777);
+		    _g_stat_mode (&original_stat) & 0777);
 
       if (bfd == -1)
 	{
@@ -1072,7 +1092,7 @@ handle_overwrite_open (const char    *filename,
                                G_IO_ERROR_CANT_CREATE_BACKUP,
                                _("Backup file creation failed"));
 	  g_free (backup_filename);
-	  goto error;
+          goto error;
 	}
 
       /* If needed, Try to set the group of the backup same as the
@@ -1080,7 +1100,7 @@ handle_overwrite_open (const char    *filename,
        * bits for the group same as the protection bits for
        * others. */
 #if defined(HAVE_FCHOWN) && defined(HAVE_FCHMOD)
-      if (fstat (bfd, &tmp_statbuf) != 0)
+      if (g_local_file_fstat (bfd, G_LOCAL_FILE_STAT_FIELD_GID, G_LOCAL_FILE_STAT_FIELD_ALL, &tmp_statbuf) != 0)
 	{
 	  g_set_error_literal (error,
                                G_IO_ERROR,
@@ -1089,15 +1109,15 @@ handle_overwrite_open (const char    *filename,
 	  g_unlink (backup_filename);
 	  g_close (bfd, NULL);
 	  g_free (backup_filename);
-	  goto error;
+          goto error;
 	}
       
-      if ((original_stat.st_gid != tmp_statbuf.st_gid)  &&
-	  fchown (bfd, (uid_t) -1, original_stat.st_gid) != 0)
+      if ((_g_stat_gid (&original_stat) != _g_stat_gid (&tmp_statbuf))  &&
+	  fchown (bfd, (uid_t) -1, _g_stat_gid (&original_stat)) != 0)
 	{
 	  if (fchmod (bfd,
-		      (original_stat.st_mode & 0707) |
-		      ((original_stat.st_mode & 07) << 3)) != 0)
+		      (_g_stat_mode (&original_stat) & 0707) |
+		      ((_g_stat_mode (&original_stat) & 07) << 3)) != 0)
 	    {
 	      g_set_error_literal (error,
                                    G_IO_ERROR,
@@ -1106,7 +1126,7 @@ handle_overwrite_open (const char    *filename,
 	      g_unlink (backup_filename);
 	      g_close (bfd, NULL);
 	      g_free (backup_filename);
-	      goto error;
+              goto error;
 	    }
 	}
 #endif
@@ -1121,7 +1141,7 @@ handle_overwrite_open (const char    *filename,
           g_close (bfd, NULL);
 	  g_free (backup_filename);
 	  
-	  goto error;
+          goto error;
 	}
       
       g_close (bfd, NULL);
@@ -1136,7 +1156,7 @@ handle_overwrite_open (const char    *filename,
 		       g_io_error_from_errno (errsv),
 		       _("Error seeking in file: %s"),
 		       g_strerror (errsv));
-	  goto error;
+          goto error;
 	}
     }
 
@@ -1152,7 +1172,7 @@ handle_overwrite_open (const char    *filename,
 		       g_io_error_from_errno (errsv),
 		       _("Error removing old file: %s"),
 		       g_strerror (errsv));
-	  goto error;
+          goto error;
 	}
 
       if (readable)
@@ -1169,7 +1189,7 @@ handle_overwrite_open (const char    *filename,
 		       _("Error opening file “%s”: %s"),
 		       display_name, g_strerror (errsv));
 	  g_free (display_name);
-	  goto error;
+          goto error;
 	}
     }
   else
@@ -1187,7 +1207,7 @@ handle_overwrite_open (const char    *filename,
 			 g_io_error_from_errno (errsv),
 			 _("Error truncating file: %s"),
 			 g_strerror (errsv));
-	    goto error;
+            goto error;
 	  }
     }
     
@@ -1256,7 +1276,6 @@ _g_local_file_output_stream_replace (const char        *filename,
       set_error_from_open_errno (filename, error);
       return NULL;
     }
-  
 #if !defined(HAVE_O_CLOEXEC) && defined(F_SETFD)
   else
     fcntl (fd, F_SETFD, FD_CLOEXEC);

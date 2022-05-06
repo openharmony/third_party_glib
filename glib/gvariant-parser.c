@@ -67,6 +67,7 @@
  * @G_VARIANT_PARSE_ERROR_UNKNOWN_KEYWORD: an unknown keyword was encountered
  * @G_VARIANT_PARSE_ERROR_UNTERMINATED_STRING_CONSTANT: unterminated string constant
  * @G_VARIANT_PARSE_ERROR_VALUE_EXPECTED: no value given
+ * @G_VARIANT_PARSE_ERROR_RECURSION: variant was too deeply nested; #GVariant is only guaranteed to handle nesting up to 64 levels (Since: 2.64)
  *
  * Error codes returned by parsing text-format GVariants.
  **/
@@ -2320,7 +2321,7 @@ parse (TokenStream  *stream,
   if (max_depth == 0)
     {
       token_stream_set_error (stream, error, FALSE,
-                              G_VARIANT_PARSE_ERROR_FAILED,
+                              G_VARIANT_PARSE_ERROR_RECURSION,
                               "variant nested too deeply");
       return NULL;
     }
@@ -2428,7 +2429,7 @@ parse (TokenStream  *stream,
  * produced by g_variant_print()".
  *
  * There may be implementation specific restrictions on deeply nested values,
- * which would result in a %G_VARIANT_PARSE_ERROR_FAILED error. #GVariant is
+ * which would result in a %G_VARIANT_PARSE_ERROR_RECURSION error. #GVariant is
  * guaranteed to handle nesting up to at least 64 levels.
  *
  * Returns: a non-floating reference to a #GVariant, or %NULL
@@ -2542,11 +2543,13 @@ g_variant_new_parsed_va (const gchar *format,
       ast_free (ast);
     }
 
-  if (result == NULL)
+  if (error != NULL)
     g_error ("g_variant_new_parsed: %s", error->message);
 
   if (*stream.stream)
     g_error ("g_variant_new_parsed: trailing text after value");
+
+  g_clear_error (&error);
 
   return result;
 }

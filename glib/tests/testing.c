@@ -67,6 +67,40 @@ test_assertions_bad_cmpvariant_values (void)
 }
 
 static void
+test_assertions_bad_cmpstrv_null1 (void)
+{
+  const char *strv[] = { "one", "two", "three", NULL };
+  g_assert_cmpstrv (strv, NULL);
+  exit (0);
+}
+
+static void
+test_assertions_bad_cmpstrv_null2 (void)
+{
+  const char *strv[] = { "one", "two", "three", NULL };
+  g_assert_cmpstrv (NULL, strv);
+  exit (0);
+}
+
+static void
+test_assertions_bad_cmpstrv_length (void)
+{
+  const char *strv1[] = { "one", "two", "three", NULL };
+  const char *strv2[] = { "one", "two", NULL };
+  g_assert_cmpstrv (strv1, strv2);
+  exit (0);
+}
+
+static void
+test_assertions_bad_cmpstrv_values (void)
+{
+  const char *strv1[] = { "one", "two", "three", NULL };
+  const char *strv2[] = { "one", "too", "three", NULL };
+  g_assert_cmpstrv (strv1, strv2);
+  exit (0);
+}
+
+static void
 test_assertions_bad_cmpstr (void)
 {
   g_assert_cmpstr ("fzz", !=, "fzz");
@@ -95,15 +129,45 @@ test_assertions_bad_cmpmem_data (void)
 }
 
 static void
+test_assertions_bad_cmpmem_null (void)
+{
+  g_assert_cmpmem (NULL, 3, NULL, 3);
+  exit (0);
+}
+
+static void
 test_assertions_bad_cmpfloat_epsilon (void)
 {
   g_assert_cmpfloat_with_epsilon (3.14, 3.15, 0.001);
   exit (0);
 }
 
+/* Emulates something like rmdir() failing. */
+static int
+return_errno (void)
+{
+  errno = ERANGE;  /* arbitrary non-zero value */
+  return -1;
+}
+
+/* Emulates something like rmdir() succeeding. */
+static int
+return_no_errno (void)
+{
+  return 0;
+}
+
+static void
+test_assertions_bad_no_errno (void)
+{
+  g_assert_no_errno (return_errno ());
+}
+
 static void
 test_assertions (void)
 {
+  const char *strv1[] = { "one", "two", "three", NULL };
+  const char *strv2[] = { "one", "two", "three", NULL };
   GVariant *v1, *v2;
   gchar *fuu;
 
@@ -127,6 +191,13 @@ test_assertions (void)
   g_assert_cmpstr ("fzz", >, "faa");
   g_assert_cmpstr ("fzz", ==, "fzz");
   g_assert_cmpmem ("foo", 3, "foot", 3);
+  g_assert_cmpmem (NULL, 0, NULL, 0);
+  g_assert_cmpmem (NULL, 0, "foot", 0);
+  g_assert_cmpmem ("foo", 0, NULL, 0);
+  g_assert_no_errno (return_no_errno ());
+
+  g_assert_cmpstrv (NULL, NULL);
+  g_assert_cmpstrv (strv1, strv2);
 
   v1 = g_variant_new_parsed ("['hello', 'there']");
   v2 = g_variant_new_parsed ("['hello', 'there']");
@@ -149,6 +220,22 @@ test_assertions (void)
   g_test_trap_assert_failed ();
   g_test_trap_assert_stderr ("*assertion failed*");
 
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpstrv_null1", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*");
+
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpstrv_null2", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*");
+
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpstrv_length", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*");
+
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpstrv_values", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*");
+
   g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpint", 0, 0);
   g_test_trap_assert_failed ();
   g_test_trap_assert_stderr ("*assertion failed*");
@@ -162,7 +249,15 @@ test_assertions (void)
   g_test_trap_assert_stderr ("*assertion failed*");
   g_test_trap_assert_stderr_unmatched ("*assertion failed*len*");
 
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpmem_null", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*NULL*");
+
   g_test_trap_subprocess ("/misc/assertions/subprocess/bad_cmpfloat_epsilon", 0, 0);
+  g_test_trap_assert_failed ();
+  g_test_trap_assert_stderr ("*assertion failed*");
+
+  g_test_trap_subprocess ("/misc/assertions/subprocess/bad_no_errno", 0, 0);
   g_test_trap_assert_failed ();
   g_test_trap_assert_stderr ("*assertion failed*");
 }
@@ -748,6 +843,18 @@ test_subprocess_timed_out (void)
   g_assert_true (g_test_trap_reached_timeout ());
 }
 
+static void
+test_path_first (void)
+{
+  g_assert_cmpstr (g_test_get_path (), ==, "/misc/path/first");
+}
+
+static void
+test_path_second (void)
+{
+  g_assert_cmpstr (g_test_get_path (), ==, "/misc/path/second");
+}
+
 static const char *argv0;
 
 static void
@@ -1078,12 +1185,17 @@ test_tap (void)
                 NULL, NULL, &output, NULL, &status,
                 &error);
   g_assert_no_error (error);
-  g_assert_nonnull (strstr (output, "1..5\n"));
+  g_assert_nonnull (strstr (output, "1..10\n"));
   g_assert_nonnull (strstr (output, "\nok 1 /a # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 2 /b/a # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 3 /b/b\n"));
-  g_assert_nonnull (strstr (output, "\nok 4 /c/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 5 /d/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 6 /prefix/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 7 /prefix/b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 8 /prefix-long/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 9 /c/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 10 /d/a\n"));
 
   g_spawn_check_exit_status (status, &error);
   g_assert_no_error (error);
@@ -1105,12 +1217,17 @@ test_tap (void)
                 NULL, NULL, &output, NULL, &status,
                 &error);
   g_assert_no_error (error);
-  g_assert_nonnull (strstr (output, "1..5\n"));
+  g_assert_nonnull (strstr (output, "1..10\n"));
   g_assert_nonnull (strstr (output, "\nok 1 /a\n"));
-  g_assert_nonnull (strstr (output, "\nok 2 /b/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 3 /b/b\n"));
-  g_assert_nonnull (strstr (output, "\nok 4 /c/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 5 /d/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 6 /prefix/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 7 /prefix/b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 8 /prefix-long/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 9 /c/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 10 /d/a\n"));
 
   g_spawn_check_exit_status (status, &error);
   g_assert_no_error (error);
@@ -1124,7 +1241,7 @@ test_tap (void)
   g_ptr_array_add (argv, "skip-options");
   g_ptr_array_add (argv, "--tap");
   g_ptr_array_add (argv, "--GTestSkipCount");
-  g_ptr_array_add (argv, "6");
+  g_ptr_array_add (argv, "11");
   g_ptr_array_add (argv, NULL);
 
   g_spawn_sync (NULL, (char **) argv->pdata, NULL,
@@ -1132,12 +1249,17 @@ test_tap (void)
                 NULL, NULL, &output, NULL, &status,
                 &error);
   g_assert_no_error (error);
-  g_assert_nonnull (strstr (output, "1..5\n"));
+  g_assert_nonnull (strstr (output, "1..10\n"));
   g_assert_nonnull (strstr (output, "\nok 1 /a # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 2 /b/a # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 3 /b/b # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 4 /c/a # SKIP\n"));
-  g_assert_nonnull (strstr (output, "\nok 5 /d/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/b # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 6 /prefix/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 7 /prefix/b/b # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 8 /prefix-long/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 9 /c/a # SKIP\n"));
+  g_assert_nonnull (strstr (output, "\nok 10 /d/a # SKIP\n"));
 
   g_spawn_check_exit_status (status, &error);
   g_assert_no_error (error);
@@ -1165,12 +1287,97 @@ test_tap (void)
   g_assert_no_error (error);
   g_assert_nonnull (strstr (output, "\nok 1 /c/a\n"));
   g_assert_nonnull (strstr (output, "\nok 2 /c/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 3 /b/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 4 /b/b\n"));
-  g_assert_nonnull (strstr (output, "\n1..4\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\n1..5\n"));
 
   g_spawn_check_exit_status (status, &error);
   g_assert_no_error (error);
+
+  g_free (output);
+  g_ptr_array_unref (argv);
+
+  g_test_message ("--run-prefix");
+  argv = g_ptr_array_new ();
+  g_ptr_array_add (argv, (char *) testing_helper);
+  g_ptr_array_add (argv, "skip-options");
+  g_ptr_array_add (argv, "--tap");
+  g_ptr_array_add (argv, "-r");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, "-r");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, "--run-prefix");
+  g_ptr_array_add (argv, "/b");
+  g_ptr_array_add (argv, NULL);
+
+  g_spawn_sync (NULL, (char **) argv->pdata, NULL,
+                G_SPAWN_STDERR_TO_DEV_NULL,
+                NULL, NULL, &output, NULL, &status,
+                &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (strstr (output, "\nok 1 /c/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 2 /c/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 6 /b/b/a\n"));
+  g_assert_nonnull (strstr (output, "\n1..6\n"));
+
+  g_spawn_check_exit_status (status, &error);
+  g_assert_no_error (error);
+
+  g_free (output);
+  g_ptr_array_unref (argv);
+
+  g_test_message ("--run-prefix 2");
+  argv = g_ptr_array_new ();
+  g_ptr_array_add (argv, (char *) testing_helper);
+  g_ptr_array_add (argv, "skip-options");
+  g_ptr_array_add (argv, "--tap");
+  g_ptr_array_add (argv, "-r");
+  g_ptr_array_add (argv, "/pre");
+  g_ptr_array_add (argv, "--run-prefix");
+  g_ptr_array_add (argv, "/b/b");
+  g_ptr_array_add (argv, NULL);
+
+  g_spawn_sync (NULL, (char **) argv->pdata, NULL,
+                G_SPAWN_STDERR_TO_DEV_NULL,
+                NULL, NULL, &output, NULL, &status,
+                &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (strstr (output, "\nok 1 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b/b/a\n"));
+  g_assert_nonnull (strstr (output, "\n1..2\n"));
+
+  g_spawn_check_exit_status (status, &error);
+  g_assert_no_error (error);
+
+  g_free (output);
+  g_ptr_array_unref (argv);
+
+  g_test_message ("--run-prefix conflict");
+  argv = g_ptr_array_new ();
+  g_ptr_array_add (argv, (char *) testing_helper);
+  g_ptr_array_add (argv, "skip-options");
+  g_ptr_array_add (argv, "--tap");
+  g_ptr_array_add (argv, "-r");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, "-p");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, "--run-prefix");
+  g_ptr_array_add (argv, "/b");
+  g_ptr_array_add (argv, NULL);
+
+  g_spawn_sync (NULL, (char **) argv->pdata, NULL,
+                G_SPAWN_STDERR_TO_DEV_NULL,
+                NULL, NULL, &output, NULL, &status,
+                &error);
+  g_assert_no_error (error);
+  g_spawn_check_exit_status (status, &error);
+  g_assert_nonnull (error);
+  g_assert_nonnull (strstr (output, "do not mix [-r | --run-prefix] with '-p'\n"));
+  g_clear_error (&error);
 
   g_free (output);
   g_ptr_array_unref (argv);
@@ -1185,6 +1392,8 @@ test_tap (void)
   g_ptr_array_add (argv, "-s");
   g_ptr_array_add (argv, "/b");
   g_ptr_array_add (argv, "-s");
+  g_ptr_array_add (argv, "/pre");
+  g_ptr_array_add (argv, "-s");
   g_ptr_array_add (argv, "/c/a");
   g_ptr_array_add (argv, NULL);
 
@@ -1193,17 +1402,85 @@ test_tap (void)
                 NULL, NULL, &output, NULL, &status,
                 &error);
   g_assert_no_error (error);
-  g_assert_nonnull (strstr (output, "1..5\n"));
+  g_assert_nonnull (strstr (output, "1..10\n"));
   g_assert_nonnull (strstr (output, "\nok 1 /a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b # SKIP by request"));
   /* "-s /b" would skip a test named exactly /b, but not a test named
    * /b/anything */
-  g_assert_nonnull (strstr (output, "\nok 2 /b/a\n"));
-  g_assert_nonnull (strstr (output, "\nok 3 /b/b\n"));
-  g_assert_nonnull (strstr (output, "\nok 4 /c/a # SKIP by request"));
-  g_assert_nonnull (strstr (output, "\nok 5 /d/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 6 /prefix/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 7 /prefix/b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 8 /prefix-long/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 9 /c/a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 10 /d/a\n"));
 
   g_spawn_check_exit_status (status, &error);
   g_assert_no_error (error);
+
+  g_free (output);
+  g_ptr_array_unref (argv);
+
+  g_test_message ("--skip-prefix");
+  argv = g_ptr_array_new ();
+  g_ptr_array_add (argv, (char *) testing_helper);
+  g_ptr_array_add (argv, "skip-options");
+  g_ptr_array_add (argv, "--tap");
+  g_ptr_array_add (argv, "-x");
+  g_ptr_array_add (argv, "/a");
+  g_ptr_array_add (argv, "--skip-prefix");
+  g_ptr_array_add (argv, "/pre");
+  g_ptr_array_add (argv, "-x");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, NULL);
+
+  g_spawn_sync (NULL, (char **) argv->pdata, NULL,
+                G_SPAWN_STDERR_TO_DEV_NULL,
+                NULL, NULL, &output, NULL, &status,
+                &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (strstr (output, "1..10\n"));
+  g_assert_nonnull (strstr (output, "\nok 1 /a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 2 /b\n"));
+  g_assert_nonnull (strstr (output, "\nok 3 /b/a\n"));
+  g_assert_nonnull (strstr (output, "\nok 4 /b/b\n"));
+  g_assert_nonnull (strstr (output, "\nok 5 /b/b/a\n"));
+  /* "--skip-prefix /pre" will skip all test path which begins with /pre */
+  g_assert_nonnull (strstr (output, "\nok 6 /prefix/a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 7 /prefix/b/b # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 8 /prefix-long/a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 9 /c/a # SKIP by request"));
+  g_assert_nonnull (strstr (output, "\nok 10 /d/a\n"));
+
+  g_spawn_check_exit_status (status, &error);
+  g_assert_no_error (error);
+
+  g_free (output);
+  g_ptr_array_unref (argv);
+
+  g_test_message ("--skip-prefix conflict");
+  argv = g_ptr_array_new ();
+  g_ptr_array_add (argv, (char *) testing_helper);
+  g_ptr_array_add (argv, "skip-options");
+  g_ptr_array_add (argv, "--tap");
+  g_ptr_array_add (argv, "-s");
+  g_ptr_array_add (argv, "/a");
+  g_ptr_array_add (argv, "--skip-prefix");
+  g_ptr_array_add (argv, "/pre");
+  g_ptr_array_add (argv, "-x");
+  g_ptr_array_add (argv, "/c/a");
+  g_ptr_array_add (argv, NULL);
+
+  g_spawn_sync (NULL, (char **) argv->pdata, NULL,
+                G_SPAWN_STDERR_TO_DEV_NULL,
+                NULL, NULL, &output, NULL, &status,
+                &error);
+  g_assert_no_error (error);
+  g_spawn_check_exit_status (status, &error);
+  g_assert_nonnull (error);
+  g_assert_nonnull (strstr (output, "do not mix [-x | --skip-prefix] with '-s'\n"));
+  g_clear_error (&error);
 
   g_free (output);
   g_ptr_array_unref (argv);
@@ -1263,10 +1540,16 @@ main (int   argc,
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpvariant_types", test_assertions_bad_cmpvariant_types);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpvariant_values", test_assertions_bad_cmpvariant_values);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpstr", test_assertions_bad_cmpstr);
+  g_test_add_func ("/misc/assertions/subprocess/bad_cmpstrv_null1", test_assertions_bad_cmpstrv_null1);
+  g_test_add_func ("/misc/assertions/subprocess/bad_cmpstrv_null2", test_assertions_bad_cmpstrv_null2);
+  g_test_add_func ("/misc/assertions/subprocess/bad_cmpstrv_length", test_assertions_bad_cmpstrv_length);
+  g_test_add_func ("/misc/assertions/subprocess/bad_cmpstrv_values", test_assertions_bad_cmpstrv_values);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpint", test_assertions_bad_cmpint);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpmem_len", test_assertions_bad_cmpmem_len);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpmem_data", test_assertions_bad_cmpmem_data);
+  g_test_add_func ("/misc/assertions/subprocess/bad_cmpmem_null", test_assertions_bad_cmpmem_null);
   g_test_add_func ("/misc/assertions/subprocess/bad_cmpfloat_epsilon", test_assertions_bad_cmpfloat_epsilon);
+  g_test_add_func ("/misc/assertions/subprocess/bad_no_errno", test_assertions_bad_no_errno);
   g_test_add_data_func ("/misc/test-data", (void*) 0xc0c0baba, test_data_test);
   g_test_add ("/misc/primetoul", Fixturetest, (void*) 0xc0cac01a, fixturetest_setup, fixturetest_test, fixturetest_teardown);
   if (g_test_perf())
@@ -1323,6 +1606,9 @@ main (int   argc,
   g_test_add_func ("/misc/fail", test_fail);
   g_test_add_func ("/misc/incomplete", test_incomplete);
   g_test_add_func ("/misc/timeout", test_subprocess_timed_out);
+
+  g_test_add_func ("/misc/path/first", test_path_first);
+  g_test_add_func ("/misc/path/second", test_path_second);
 
   g_test_add_func ("/tap", test_tap);
   g_test_add_func ("/tap/summary", test_tap_summary);

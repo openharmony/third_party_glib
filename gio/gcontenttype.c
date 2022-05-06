@@ -405,7 +405,9 @@ load_comment_for_mime_helper (const char *dir,
   GMarkupParser parser = {
     mime_info_start_element,
     mime_info_end_element,
-    mime_info_text
+    mime_info_text,
+    NULL,
+    NULL
   };
 
   filename = g_build_filename (dir, basename, NULL);
@@ -613,6 +615,8 @@ g_content_type_get_generic_icon_name (const gchar *type)
 {
   const gchar *xdg_icon_name;
   gchar *icon_name;
+
+  g_return_val_if_fail (type != NULL, NULL);
 
   G_LOCK (gio_xdgmime);
   xdg_icon_name = xdg_mime_get_generic_icon (type);

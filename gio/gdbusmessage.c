@@ -264,7 +264,7 @@ g_memory_buffer_write (GMemoryBuffer  *mbuf,
 
   if (mbuf->pos + count > mbuf->len)
     {
-      /* At least enought to fit the write, rounded up
+      /* At least enough to fit the write, rounded up
 	     for greater than linear growth.
          TODO: This wastes a lot of memory at large buffer sizes.
                Figure out a more rational allocation strategy. */
@@ -877,7 +877,7 @@ g_dbus_message_set_message_type (GDBusMessage      *message,
                                  GDBusMessageType   type)
 {
   g_return_if_fail (G_IS_DBUS_MESSAGE (message));
-  g_return_if_fail ((guint) type >= 0 && (guint) type < 256);
+  g_return_if_fail ((guint) type < 256);
 
   if (message->locked)
     {
@@ -924,7 +924,7 @@ g_dbus_message_set_flags (GDBusMessage       *message,
                           GDBusMessageFlags   flags)
 {
   g_return_if_fail (G_IS_DBUS_MESSAGE (message));
-  g_return_if_fail ((guint) flags >= 0 && (guint) flags < 256);
+  g_return_if_fail ((guint) flags < 256);
 
   if (message->locked)
     {
@@ -1002,7 +1002,7 @@ g_dbus_message_get_header (GDBusMessage             *message,
                            GDBusMessageHeaderField   header_field)
 {
   g_return_val_if_fail (G_IS_DBUS_MESSAGE (message), NULL);
-  g_return_val_if_fail ((guint) header_field >= 0 && (guint) header_field < 256, NULL);
+  g_return_val_if_fail ((guint) header_field < 256, NULL);
   return g_hash_table_lookup (message->headers, GUINT_TO_POINTER (header_field));
 }
 
@@ -1024,7 +1024,7 @@ g_dbus_message_set_header (GDBusMessage             *message,
                            GVariant                 *value)
 {
   g_return_if_fail (G_IS_DBUS_MESSAGE (message));
-  g_return_if_fail ((guint) header_field >= 0 && (guint) header_field < 256);
+  g_return_if_fail ((guint) header_field < 256);
 
   if (message->locked)
     {
@@ -1085,7 +1085,7 @@ g_dbus_message_get_header_fields (GDBusMessage  *message)
  *
  * Gets the body of a message.
  *
- * Returns: (transfer none): A #GVariant or %NULL if the body is
+ * Returns: (nullable) (transfer none): A #GVariant or %NULL if the body is
  * empty. Do not free, it is owned by @message.
  *
  * Since: 2.26
@@ -1158,7 +1158,13 @@ g_dbus_message_set_body (GDBusMessage  *message,
  *
  * This method is only available on UNIX.
  *
- * Returns: (transfer none):A #GUnixFDList or %NULL if no file descriptors are
+ * The file descriptors normally correspond to %G_VARIANT_TYPE_HANDLE
+ * values in the body of the message. For example,
+ * if g_variant_get_handle() returns 5, that is intended to be a reference
+ * to the file descriptor that can be accessed by
+ * `g_unix_fd_list_get (list, 5, ...)`.
+ *
+ * Returns: (nullable) (transfer none): A #GUnixFDList or %NULL if no file descriptors are
  * associated. Do not free, this object is owned by @message.
  *
  * Since: 2.26
@@ -1181,6 +1187,11 @@ g_dbus_message_get_unix_fd_list (GDBusMessage  *message)
  * @fd_list is %NULL).
  *
  * This method is only available on UNIX.
+ *
+ * When designing D-Bus APIs that are intended to be interoperable,
+ * please note that non-GDBus implementations of D-Bus can usually only
+ * access file descriptors if they are referenced by a value of type
+ * %G_VARIANT_TYPE_HANDLE in the body of the message.
  *
  * Since: 2.26
  */
@@ -2786,7 +2797,7 @@ g_dbus_message_to_blob (GDBusMessage          *message,
                        G_IO_ERROR,
                        G_IO_ERROR_INVALID_ARGUMENT,
                        _("Message body has signature “%s” but there is no signature header"),
-                       signature_str);
+                       g_variant_get_type_string (message->body));
           goto out;
         }
       tupled_signature_str = g_strdup_printf ("(%s)", signature_str);
@@ -2796,7 +2807,7 @@ g_dbus_message_to_blob (GDBusMessage          *message,
                        G_IO_ERROR,
                        G_IO_ERROR_INVALID_ARGUMENT,
                        _("Message body has type signature “%s” but signature in the header field is “%s”"),
-                       tupled_signature_str, g_variant_get_type_string (message->body));
+                       g_variant_get_type_string (message->body), tupled_signature_str);
           g_free (tupled_signature_str);
           goto out;
         }
@@ -2983,7 +2994,7 @@ g_dbus_message_set_reply_serial (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_INTERFACE header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -2997,7 +3008,7 @@ g_dbus_message_get_interface (GDBusMessage  *message)
 /**
  * g_dbus_message_set_interface:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_INTERFACE header field.
  *
@@ -3020,7 +3031,7 @@ g_dbus_message_set_interface (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_MEMBER header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -3034,7 +3045,7 @@ g_dbus_message_get_member (GDBusMessage  *message)
 /**
  * g_dbus_message_set_member:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_MEMBER header field.
  *
@@ -3057,7 +3068,7 @@ g_dbus_message_set_member (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_PATH header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -3071,7 +3082,7 @@ g_dbus_message_get_path (GDBusMessage  *message)
 /**
  * g_dbus_message_set_path:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_PATH header field.
  *
@@ -3094,7 +3105,7 @@ g_dbus_message_set_path (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_SENDER header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -3108,7 +3119,7 @@ g_dbus_message_get_sender (GDBusMessage *message)
 /**
  * g_dbus_message_set_sender:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_SENDER header field.
  *
@@ -3131,7 +3142,7 @@ g_dbus_message_set_sender (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_DESTINATION header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -3145,7 +3156,7 @@ g_dbus_message_get_destination (GDBusMessage  *message)
 /**
  * g_dbus_message_set_destination:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_DESTINATION header field.
  *
@@ -3168,7 +3179,7 @@ g_dbus_message_set_destination (GDBusMessage  *message,
  *
  * Convenience getter for the %G_DBUS_MESSAGE_HEADER_FIELD_ERROR_NAME header field.
  *
- * Returns: The value.
+ * Returns: (nullable): The value.
  *
  * Since: 2.26
  */
@@ -3181,7 +3192,7 @@ g_dbus_message_get_error_name (GDBusMessage  *message)
 
 /**
  * g_dbus_message_set_error_name:
- * @message: A #GDBusMessage.
+ * @message: (nullable): A #GDBusMessage.
  * @value: The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_ERROR_NAME header field.
@@ -3223,7 +3234,7 @@ g_dbus_message_get_signature (GDBusMessage  *message)
 /**
  * g_dbus_message_set_signature:
  * @message: A #GDBusMessage.
- * @value: The value to set.
+ * @value: (nullable): The value to set.
  *
  * Convenience setter for the %G_DBUS_MESSAGE_HEADER_FIELD_SIGNATURE header field.
  *
@@ -3246,7 +3257,7 @@ g_dbus_message_set_signature (GDBusMessage  *message,
  *
  * Convenience to get the first item in the body of @message.
  *
- * Returns: The string item or %NULL if the first item in the body of
+ * Returns: (nullable): The string item or %NULL if the first item in the body of
  * @message is not a string.
  *
  * Since: 2.26
@@ -3378,7 +3389,7 @@ g_dbus_message_to_gerror (GDBusMessage   *message,
     }
   else
     {
-      /* TOOD: this shouldn't happen - should check this at message serialization
+      /* TODO: this shouldn't happen - should check this at message serialization
        * time and disconnect the peer.
        */
       g_set_error (error,

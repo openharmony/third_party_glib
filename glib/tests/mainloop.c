@@ -25,28 +25,34 @@
 #include <stdio.h>
 #include <string.h>
 
-static gboolean cb (gpointer data)
+static gboolean
+cb (gpointer data)
 {
   return FALSE;
 }
 
-static gboolean prepare (GSource *source, gint *time)
+static gboolean
+prepare (GSource *source, gint *time)
 {
   return FALSE;
 }
-static gboolean check (GSource *source)
+static gboolean
+check (GSource *source)
 {
   return FALSE;
 }
-static gboolean dispatch (GSource *source, GSourceFunc cb, gpointer date)
+static gboolean
+dispatch (GSource *source, GSourceFunc cb, gpointer date)
 {
   return FALSE;
 }
 
-GSourceFuncs funcs = {
+static GSourceFuncs funcs = {
   prepare,
   check,
   dispatch,
+  NULL,
+  NULL,
   NULL
 };
 
@@ -117,6 +123,7 @@ test_maincontext_basic (void)
   g_source_set_funcs (source, &funcs);
   g_source_set_callback (source, cb, data, NULL);
   id = g_source_attach (source, ctx);
+  g_assert_cmpint (id, >, 0);
   g_source_unref (source);
   g_assert_true (g_source_remove_by_user_data (data));
   g_assert_false (g_source_remove_by_user_data ((gpointer)0x1234));
@@ -167,6 +174,12 @@ test_timeouts (void)
   GMainContext *ctx;
   GMainLoop *loop;
   GSource *source;
+
+  if (!g_test_thorough ())
+    {
+      g_test_skip ("Not running timing heavy test");
+      return;
+    }
 
   a = b = c = 0;
 
@@ -408,6 +421,8 @@ static GSourceFuncs counter_source_funcs = {
   NULL,
   counter_source_dispatch,
   NULL,
+  NULL,
+  NULL
 };
 
 static GSource *
@@ -903,7 +918,7 @@ test_mainloop_overflow (void)
   g_main_context_unref (ctx);
 }
 
-static volatile gint ready_time_dispatched;
+static gint ready_time_dispatched;  /* (atomic) */
 
 static gboolean
 ready_time_dispatch (GSource     *source,
@@ -931,7 +946,7 @@ test_ready_time (void)
   GThread *thread;
   GSource *source;
   GSourceFuncs source_funcs = {
-    NULL, NULL, ready_time_dispatch
+    NULL, NULL, ready_time_dispatch, NULL, NULL, NULL
   };
   GMainLoop *loop;
 
@@ -949,7 +964,7 @@ test_ready_time (void)
   /* A source with no ready time set should not fire */
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_false (ready_time_dispatched);
+  g_assert_false (g_atomic_int_get (&ready_time_dispatched));
 
   /* The ready time should not have been changed */
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
@@ -963,37 +978,37 @@ test_ready_time (void)
    */
   g_source_set_ready_time (source, g_get_monotonic_time () + G_TIME_SPAN_DAY);
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_false (ready_time_dispatched);
+  g_assert_false (g_atomic_int_get (&ready_time_dispatched));
   /* Make sure it didn't get reset */
   g_assert_cmpint (g_source_get_ready_time (source), !=, -1);
 
   /* Ready time of -1 -> don't fire */
   g_source_set_ready_time (source, -1);
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_false (ready_time_dispatched);
+  g_assert_false (g_atomic_int_get (&ready_time_dispatched));
   /* Not reset, but should still be -1 from above */
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
 
   /* A ready time of the current time should fire immediately */
   g_source_set_ready_time (source, g_get_monotonic_time ());
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_true (ready_time_dispatched);
-  ready_time_dispatched = FALSE;
+  g_assert_true (g_atomic_int_get (&ready_time_dispatched));
+  g_atomic_int_set (&ready_time_dispatched, FALSE);
   /* Should have gotten reset by the handler function */
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
 
   /* As well as one in the recent past... */
   g_source_set_ready_time (source, g_get_monotonic_time () - G_TIME_SPAN_SECOND);
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_true (ready_time_dispatched);
-  ready_time_dispatched = FALSE;
+  g_assert_true (g_atomic_int_get (&ready_time_dispatched));
+  g_atomic_int_set (&ready_time_dispatched, FALSE);
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
 
   /* Zero is the 'official' way to get a source to fire immediately */
   g_source_set_ready_time (source, 0);
   while (g_main_context_iteration (NULL, FALSE));
-  g_assert_true (ready_time_dispatched);
-  ready_time_dispatched = FALSE;
+  g_assert_true (g_atomic_int_get (&ready_time_dispatched));
+  g_atomic_int_set (&ready_time_dispatched, FALSE);
   g_assert_cmpint (g_source_get_ready_time (source), ==, -1);
 
   /* Now do some tests of cross-thread wakeups.
@@ -1074,7 +1089,9 @@ trivial_finalize (GSource *source)
 static void
 test_unref_while_pending (void)
 {
-  static GSourceFuncs funcs = { trivial_prepare, NULL, NULL, trivial_finalize };
+  static GSourceFuncs funcs = {
+    trivial_prepare, NULL, NULL, trivial_finalize, NULL, NULL
+  };
   GMainContext *context;
   GSource *source;
 
@@ -1132,7 +1149,7 @@ write_bytes (gint         fd,
   /* Detect if we run before we should */
   g_assert_cmpint (*to_write, >=, 0);
 
-  limit = MIN (*to_write, sizeof zeros);
+  limit = MIN ((gsize) *to_write, sizeof zeros);
   *to_write -= write (fd, zeros, limit);
 
   return TRUE;
@@ -1388,7 +1405,7 @@ static void
 test_source_unix_fd_api (void)
 {
   GSourceFuncs no_funcs = {
-    NULL, NULL, return_true
+    NULL, NULL, return_true, NULL, NULL, NULL
   };
   GSource *source_a;
   GSource *source_b;
@@ -1531,6 +1548,62 @@ test_unix_file_poll (void)
   close (fd);
 }
 
+static void
+test_unix_fd_priority (void)
+{
+  gint fd1, fd2;
+  GMainLoop *loop;
+  GSource *source;
+
+  gint s1 = 0;
+  gboolean s2 = FALSE, s3 = FALSE;
+
+  g_test_bug ("https://gitlab.gnome.org/GNOME/glib/-/issues/1592");
+
+  loop = g_main_loop_new (NULL, FALSE);
+
+  source = g_idle_source_new ();
+  g_source_set_callback (source, count_calls, &s1, NULL);
+  g_source_set_priority (source, 0);
+  g_source_attach (source, NULL);
+  g_source_unref (source);
+
+  fd1 = open ("/dev/random", O_RDONLY);
+  g_assert_cmpint (fd1, >=, 0);
+  source = g_unix_fd_source_new (fd1, G_IO_IN);
+  g_source_set_callback (source, G_SOURCE_FUNC (flag_bool), &s2, NULL);
+  g_source_set_priority (source, 10);
+  g_source_attach (source, NULL);
+  g_source_unref (source);
+
+  fd2 = open ("/dev/random", O_RDONLY);
+  g_assert_cmpint (fd2, >=, 0);
+  source = g_unix_fd_source_new (fd2, G_IO_IN);
+  g_source_set_callback (source, G_SOURCE_FUNC (flag_bool), &s3, NULL);
+  g_source_set_priority (source, 0);
+  g_source_attach (source, NULL);
+  g_source_unref (source);
+
+  /* This tests a bug that depends on the source with the lowest FD
+     identifier to have the lowest priority. Make sure that this is
+     the case. */
+  g_assert_cmpint (fd1, <, fd2);
+
+  g_assert_true (g_main_context_iteration (NULL, FALSE));
+
+  /* Idle source should have been dispatched. */
+  g_assert_cmpint (s1, ==, 1);
+  /* Low priority FD source shouldn't have been dispatched. */
+  g_assert_false (s2);
+  /* Default priority FD source should have been dispatched. */
+  g_assert_true (s3);
+
+  g_main_loop_unref (loop);
+
+  close (fd1);
+  close (fd2);
+}
+
 #endif
 
 #ifdef G_OS_UNIX
@@ -1572,6 +1645,10 @@ threadf (gpointer data)
 static void
 test_mainloop_wait (void)
 {
+#ifdef _GLIB_ADDRESS_SANITIZER
+  (void) threadf;
+  g_test_incomplete ("FIXME: Leaks a GMainLoop, see glib#2307");
+#else
   GMainContext *context;
   GThread *t1, *t2;
 
@@ -1584,6 +1661,7 @@ test_mainloop_wait (void)
   g_thread_join (t2);
 
   g_main_context_unref (context);
+#endif
 }
 #endif
 
@@ -1746,6 +1824,84 @@ test_nfds (void)
   g_main_context_unref (ctx);
 }
 
+static gboolean source_finalize_called = FALSE;
+static guint source_dispose_called = 0;
+static gboolean source_dispose_recycle = FALSE;
+
+static void
+finalize (GSource *source)
+{
+  g_assert_false (source_finalize_called);
+  source_finalize_called = TRUE;
+}
+
+static void
+dispose (GSource *source)
+{
+  /* Dispose must always be called before finalize */
+  g_assert_false (source_finalize_called);
+
+  if (source_dispose_recycle)
+    g_source_ref (source);
+  source_dispose_called++;
+}
+
+static GSourceFuncs source_funcs = {
+  prepare,
+  check,
+  dispatch,
+  finalize,
+  NULL,
+  NULL
+};
+
+static void
+test_maincontext_source_finalization (void)
+{
+  GSource *source;
+
+  /* Check if GSource destruction without dispose function works and calls the
+   * finalize function as expected */
+  source_finalize_called = FALSE;
+  source_dispose_called = 0;
+  source_dispose_recycle = FALSE;
+  source = g_source_new (&source_funcs, sizeof (GSource));
+  g_source_unref (source);
+  g_assert_cmpint (source_dispose_called, ==, 0);
+  g_assert_true (source_finalize_called);
+
+  /* Check if GSource destruction with dispose function works and calls the
+   * dispose and finalize function as expected */
+  source_finalize_called = FALSE;
+  source_dispose_called = 0;
+  source_dispose_recycle = FALSE;
+  source = g_source_new (&source_funcs, sizeof (GSource));
+  g_source_set_dispose_function (source, dispose);
+  g_source_unref (source);
+  g_assert_cmpint (source_dispose_called, ==, 1);
+  g_assert_true (source_finalize_called);
+
+  /* Check if GSource destruction with dispose function works and recycling
+   * the source from dispose works without calling the finalize function */
+  source_finalize_called = FALSE;
+  source_dispose_called = 0;
+  source_dispose_recycle = TRUE;
+  source = g_source_new (&source_funcs, sizeof (GSource));
+  g_source_set_dispose_function (source, dispose);
+  g_source_unref (source);
+  g_assert_cmpint (source_dispose_called, ==, 1);
+  g_assert_false (source_finalize_called);
+
+  /* Check if the source is properly recycled */
+  g_assert_cmpint (source->ref_count, ==, 1);
+
+  /* And then get rid of it properly */
+  source_dispose_recycle = FALSE;
+  g_source_unref (source);
+  g_assert_cmpint (source_dispose_called, ==, 2);
+  g_assert_true (source_finalize_called);
+}
+
 /* GSource implementation which optionally keeps a strong reference to another
  * GSource until finalization, when it destroys and unrefs the other source.
  */
@@ -1772,7 +1928,9 @@ static GSourceFuncs source_with_source_funcs = {
   NULL,
   NULL,
   NULL,
-  finalize_source_with_source
+  finalize_source_with_source,
+  NULL,
+  NULL
 };
 
 static void
@@ -1855,7 +2013,9 @@ static GSourceFuncs source_with_source_funcs_dispatch = {
   NULL,
   NULL,
   dispatch_source_with_source,
-  finalize_source_with_source
+  finalize_source_with_source,
+  NULL,
+  NULL
 };
 
 static void
@@ -1915,6 +2075,7 @@ main (int argc, char *argv[])
   g_test_bug_base ("http://bugzilla.gnome.org/");
 
   g_test_add_func ("/maincontext/basic", test_maincontext_basic);
+  g_test_add_func ("/maincontext/source_finalization", test_maincontext_source_finalization);
   for (i = 0; i < 10; i++)
     {
       gchar *name = g_strdup_printf ("/maincontext/source_finalization_from_source/%d", i);
@@ -1947,6 +2108,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/mainloop/source-unix-fd-api", test_source_unix_fd_api);
   g_test_add_func ("/mainloop/wait", test_mainloop_wait);
   g_test_add_func ("/mainloop/unix-file-poll", test_unix_file_poll);
+  g_test_add_func ("/mainloop/unix-fd-priority", test_unix_fd_priority);
 #endif
   g_test_add_func ("/mainloop/nfds", test_nfds);
 

@@ -26,6 +26,12 @@
         <userinput>ninja -C _build</userinput>
         <userinput>ninja -C _build install</userinput>
       </literallayout>
+
+      On FreeBSD:
+      <literallayout>
+        <userinput>env CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/lib -Wl,--disable-new-dtags" meson -Dxattr=false -Dinstalled_tests=true -Diconv=external -Db_lundef=false _build</userinput>
+        <userinput>ninja -C _build</userinput>
+      </literallayout>
     </para>
 
     <para>
@@ -121,6 +127,16 @@
       </listitem>
       <listitem>
         <para>
+          Python 3.5 or newer is required. Your system Python must
+          conform to <ulink
+          url="https://www.python.org/dev/peps/pep-0394/">PEP 394
+          </ulink>
+          For FreeBSD, this means that the
+          <literal>lang/python3</literal> port must be installed.
+        </para>
+      </listitem>
+      <listitem>
+        <para>
           The libintl library from the <ulink
           url="http://www.gnu.org/software/gettext">GNU gettext
           package</ulink> is needed if your system doesn't have the
@@ -199,6 +215,12 @@
         type starts with <literal>debug</literal>,
         <literal>G_ENABLE_DEBUG</literal> will be defined and GLib will be built
         with additional debug code enabled.
+      </para>
+      <para>
+        If the build type is <literal>plain</literal>, GLib will not enable any
+        optimization or debug options by default, and will leave it entirely to
+        the user to choose their options. To build with the options recommended
+        by GLib developers, choose <literal>release</literal>.
       </para>
     </formalpara>
 

@@ -43,7 +43,7 @@
 #include "gunixfdlist.h"
 #endif
 
-/* DBus Interface definition {{{1 */
+/* D-Bus Interface definition {{{1 */
 
 /* For documentation of these interfaces, see
  * https://wiki.gnome.org/Projects/GLib/GApplication/DBusAPI
@@ -361,16 +361,18 @@ g_application_impl_attempt_primary (GApplicationImpl  *impl,
                                     GCancellable      *cancellable,
                                     GError           **error)
 {
-  const static GDBusInterfaceVTable vtable = {
+  static const GDBusInterfaceVTable vtable = {
     g_application_impl_method_call,
     g_application_impl_get_property,
-    NULL /* set_property */
+    NULL, /* set_property */
+    { 0 }
   };
   GApplicationClass *app_class = G_APPLICATION_GET_CLASS (impl->app);
   GBusNameOwnerFlags name_owner_flags;
   GApplicationFlags app_flags;
   GVariant *reply;
   guint32 rval;
+  GError *local_error = NULL;
 
   if (org_gtk_Application == NULL)
     {
@@ -430,8 +432,14 @@ g_application_impl_attempt_primary (GApplicationImpl  *impl,
   if (!app_class->dbus_register (impl->app,
                                  impl->session_bus,
                                  impl->object_path,
-                                 error))
-    return FALSE;
+                                 &local_error))
+    {
+      g_return_val_if_fail (local_error != NULL, FALSE);
+      g_propagate_error (error, g_steal_pointer (&local_error));
+      return FALSE;
+    }
+
+  g_return_val_if_fail (local_error == NULL, FALSE);
 
   if (impl->bus_name == NULL)
     {
@@ -640,7 +648,7 @@ g_application_impl_register (GApplication        *application,
 
   /* We are non-primary.  Try to get the primary's list of actions.
    * This also serves as a mechanism to ensure that the primary exists
-   * (ie: DBus service files installed correctly, etc).
+   * (ie: D-Bus service files installed correctly, etc).
    */
   actions = g_dbus_action_group_get (impl->session_bus, impl->bus_name, impl->object_path);
   if (!g_dbus_action_group_sync (actions, cancellable, error))
@@ -768,8 +776,8 @@ g_application_impl_command_line (GApplicationImpl    *impl,
                                  const gchar * const *arguments,
                                  GVariant            *platform_data)
 {
-  const static GDBusInterfaceVTable vtable = {
-    g_application_impl_cmdline_method_call
+  static const GDBusInterfaceVTable vtable = {
+    g_application_impl_cmdline_method_call, NULL, NULL, { 0 }
   };
   const gchar *object_path = "/org/gtk/Application/CommandLine";
   GMainContext *context;
