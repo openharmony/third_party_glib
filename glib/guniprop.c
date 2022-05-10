@@ -362,7 +362,7 @@ g_unichar_istitle (gunichar c)
  * g_unichar_isxdigit:
  * @c: a Unicode character.
  * 
- * Determines if a character is a hexidecimal digit.
+ * Determines if a character is a hexadecimal digit.
  * 
  * Returns: %TRUE if the character is a hexadecimal digit
  **/
@@ -624,7 +624,7 @@ g_unichar_totitle (gunichar c)
 {
   unsigned int i;
 
-  /* We handle U+0000 explicitely because some elements in
+  /* We handle U+0000 explicitly because some elements in
    * title_table[i][1] may be null. */
   if (c == 0)
     return c;
@@ -664,7 +664,7 @@ g_unichar_digit_value (gunichar c)
  * g_unichar_xdigit_value:
  * @c: a Unicode character
  *
- * Determines the numeric value of a character as a hexidecimal
+ * Determines the numeric value of a character as a hexadecimal
  * digit.
  *
  * Returns: If @c is a hex digit (according to
@@ -987,14 +987,18 @@ real_tolower (const gchar *str,
       last = p;
       p = g_utf8_next_char (p);
 
-      if (locale_type == LOCALE_TURKIC && (c == 'I' ||
+      if (locale_type == LOCALE_TURKIC && (c == 'I' || c == 0x130 ||
                                            c == G_UNICHAR_FULLWIDTH_I))
-	{
-          if (g_utf8_get_char (p) == 0x0307)
+        {
+          gboolean combining_dot = (c == 'I' || c == G_UNICHAR_FULLWIDTH_I) &&
+                                   g_utf8_get_char (p) == 0x0307;
+          if (combining_dot || c == 0x130)
             {
-              /* I + COMBINING DOT ABOVE => i (U+0069) */
-              len += g_unichar_to_utf8 (0x0069, out_buffer ? out_buffer + len : NULL); 
-              p = g_utf8_next_char (p);
+              /* I + COMBINING DOT ABOVE => i (U+0069)
+               * LATIN CAPITAL LETTER I WITH DOT ABOVE => i (U+0069) */
+              len += g_unichar_to_utf8 (0x0069, out_buffer ? out_buffer + len : NULL);
+              if (combining_dot)
+                p = g_utf8_next_char (p);
             }
           else
             {
@@ -1476,6 +1480,12 @@ static const guint32 iso15924_tags[] =
     PACK ('N','a','n','d'), /* G_UNICODE_SCRIPT_NANDINAGARI */
     PACK ('H','m','n','p'), /* G_UNICODE_SCRIPT_NYIAKENG_PUACHUE_HMONG */
     PACK ('W','c','h','o'), /* G_UNICODE_SCRIPT_WANCHO */
+
+  /* Unicode 13.0 additions */
+    PACK ('C', 'h', 'r', 's'), /* G_UNICODE_SCRIPT_CHORASMIAN */
+    PACK ('D', 'i', 'a', 'k'), /* G_UNICODE_SCRIPT_DIVES_AKURU */
+    PACK ('K', 'i', 't', 's'), /* G_UNICODE_SCRIPT_KHITAN_SMALL_SCRIPT */
+    PACK ('Y', 'e', 'z', 'i'), /* G_UNICODE_SCRIPT_YEZIDI */
 #undef PACK
 };
 

@@ -14,6 +14,9 @@ glib_tests = {
   'collate' : {},
   'cond' : {},
   'convert' : {},
+  'cxx' : {
+    'source' : ['cxx.cpp'],
+  },
   'dataset' : {},
   'date' : {},
   'dir' : {},
@@ -35,6 +38,7 @@ glib_tests = {
   'hmac' : {},
   'hook' : {},
   'hostutils' : {},
+  'io-channel' : {},
   'keyfile' : {},
   'list' : {},
   'logging' : {},
@@ -46,7 +50,10 @@ glib_tests = {
   'markup-collect' : {},
   'markup-escape' : {},
   'markup-subparser' : {},
-  'mem-overflow' : {},
+  'mem-overflow' : {
+    'link_args' : cc.get_id() == 'gcc' and cc.version().version_compare('> 6')
+      ? ['-Wno-alloc-size-larger-than'] : [],
+  },
   'mutex' : {},
   'node' : {},
   'once' : {},
@@ -85,12 +92,15 @@ glib_tests = {
   'slist' : {},
   'sort' : {},
   'spawn-multithreaded' : {},
+  'spawn-path-search' : {},
   'spawn-singlethread' : {},
   'strfuncs' : {},
   'string' : {},
+  'strvbuilder' : {},
   'testing' : {},
   'test-printf' : {},
   'thread' : {},
+  'thread-pool' : {},
   'timeout' : {},
   'timer' : {},
   'tree' : {},
@@ -148,6 +158,27 @@ else
     'include' : {},
     'unix' : {},
   }
+  if have_rtld_next
+    glib_tests += {
+      'gutils-user-database' : {
+        'depends' : [
+          shared_library('getpwuid-preload',
+            'getpwuid-preload.c',
+            name_prefix : '',
+            dependencies: libdl_dep,
+            install_dir : installed_tests_execdir,
+            install: installed_tests_enabled,
+          ),
+        ],
+        'env' : {
+          'LD_PRELOAD': '@0@/getpwuid-preload.so'.format(meson.current_build_dir()),
+        },
+        'installed_tests_env' : {
+          'LD_PRELOAD': '@0@/getpwuid-preload.so'.format(installed_tests_execdir),
+        },
+      },
+    }
+  endif
 endif
 
 if installed_tests_enabled
@@ -163,6 +194,7 @@ if installed_tests_enabled
   )
   install_subdir('bookmarks', install_dir : installed_tests_execdir)
   install_subdir('markups', install_dir : installed_tests_execdir)
+  install_subdir('time-zones', install_dir : installed_tests_execdir)
 endif
 
 # Not entirely random of course, but at least it changes over time
@@ -197,6 +229,7 @@ foreach test_name, extra_args : glib_tests
 
   exe = executable(test_name, source,
     c_args : test_cargs + extra_args.get('c_args', []),
+    link_args : extra_args.get('link_args', []),
     dependencies : test_deps + extra_args.get('dependencies', []),
     install_dir: installed_tests_execdir,
     install: install,
@@ -206,6 +239,20 @@ foreach test_name, extra_args : glib_tests
   timeout = suite.contains('slow') ? test_timeout_slow : test_timeout
   test(test_name, exe, env : test_env, timeout : timeout, suite : suite)
 endforeach
+
+executable('spawn-path-search-helper', 'spawn-path-search-helper.c',
+  c_args : test_cargs,
+  dependencies : test_deps,
+  install_dir: installed_tests_execdir,
+  install: installed_tests_enabled,
+)
+
+executable('spawn-test-helper', 'spawn-test-helper.c',
+  c_args : test_cargs,
+  dependencies : test_deps,
+  install_dir: installed_tests_execdir,
+  install: installed_tests_enabled,
+)
 
 # test-spawn-echo helper binary required by the spawn tests above
 executable('test-spawn-echo', 'test-spawn-echo.c',
@@ -238,3 +285,5 @@ if not meson.is_cross_build() and host_system != 'windows'
     )
   endif
 endif
+
+subdir('path-test-subdir')

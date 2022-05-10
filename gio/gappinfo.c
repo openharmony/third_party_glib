@@ -138,7 +138,7 @@ g_app_info_dup (GAppInfo *appinfo)
  *
  * Checks if two #GAppInfos are equal.
  *
- * Note that the check <emphasis>may not</emphasis> compare each individual
+ * Note that the check *may not* compare each individual
  * field, and only does an identity check. In case detecting changes in the 
  * contents is needed, program code must additionally compare relevant fields.
  *
@@ -173,7 +173,7 @@ g_app_info_equal (GAppInfo *appinfo1,
  * Note that the returned ID may be %NULL, depending on how
  * the @appinfo has been constructed.
  *
- * Returns: a string containing the application's ID.
+ * Returns: (nullable): a string containing the application's ID.
  **/
 const char *
 g_app_info_get_id (GAppInfo *appinfo)
@@ -240,7 +240,7 @@ g_app_info_get_display_name (GAppInfo *appinfo)
  * 
  * Gets a human-readable description of an installed application.
  *
- * Returns: a string containing a description of the 
+ * Returns: (nullable): a string containing a description of the 
  * application @appinfo, or %NULL if none. 
  **/
 const char *
@@ -256,7 +256,7 @@ g_app_info_get_description (GAppInfo *appinfo)
 }
 
 /**
- * g_app_info_get_executable:
+ * g_app_info_get_executable: (virtual get_executable)
  * @appinfo: a #GAppInfo
  * 
  * Gets the executable's name for the installed application.
@@ -278,13 +278,13 @@ g_app_info_get_executable (GAppInfo *appinfo)
 
 
 /**
- * g_app_info_get_commandline:
+ * g_app_info_get_commandline: (virtual get_commandline)
  * @appinfo: a #GAppInfo
  * 
  * Gets the commandline with which the application will be
  * started.  
  *
- * Returns: (type filename): a string containing the @appinfo's commandline,
+ * Returns: (nullable) (type filename): a string containing the @appinfo's commandline,
  *     or %NULL if this information is not available
  *
  * Since: 2.20
@@ -518,7 +518,7 @@ g_app_info_get_supported_types (GAppInfo *appinfo)
  * 
  * Gets the icon for the application.
  *
- * Returns: (transfer none): the default #GIcon for @appinfo or %NULL
+ * Returns: (nullable) (transfer none): the default #GIcon for @appinfo or %NULL
  * if there is no default icon.
  **/
 GIcon *
@@ -1279,7 +1279,7 @@ g_app_launch_context_get_environment (GAppLaunchContext *context)
  * applications are started on the same display as the launching
  * application, by setting the `DISPLAY` environment variable.
  *
- * Returns: a display string for the display.
+ * Returns: (nullable): a display string for the display.
  */
 char *
 g_app_launch_context_get_display (GAppLaunchContext *context,
@@ -1309,9 +1309,9 @@ g_app_launch_context_get_display (GAppLaunchContext *context,
  * `DESKTOP_STARTUP_ID` for the launched operation, if supported.
  *
  * Startup notification IDs are defined in the 
- * [FreeDesktop.Org Startup Notifications standard](http://standards.freedesktop.org/startup-notification-spec/startup-notification-latest.txt").
+ * [FreeDesktop.Org Startup Notifications standard](http://standards.freedesktop.org/startup-notification-spec/startup-notification-latest.txt).
  *
- * Returns: a startup notification ID for the application, or %NULL if
+ * Returns: (nullable): a startup notification ID for the application, or %NULL if
  *     not supported.
  **/
 char *

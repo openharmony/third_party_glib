@@ -21,7 +21,9 @@
  */
 
 /* We are testing some deprecated APIs here */
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include <glib.h>
 
@@ -191,7 +193,7 @@ test_async_queue_timed (void)
   /* diff should be only a little bit more than G_USEC_PER_SEC/10, but
    * we have to leave some wiggle room for heavily-loaded machines...
    */
-  g_assert_cmpint (diff, <, G_USEC_PER_SEC);
+  g_assert_cmpint (diff, <, 2 * G_USEC_PER_SEC);
 
   start = end;
   g_get_current_time (&tv);
@@ -202,7 +204,7 @@ test_async_queue_timed (void)
   end = g_get_monotonic_time ();
   diff = end - start;
   g_assert_cmpint (diff, >=, G_USEC_PER_SEC / 10);
-  g_assert_cmpint (diff, <, G_USEC_PER_SEC);
+  g_assert_cmpint (diff, <, 2 * G_USEC_PER_SEC);
 
   start = end;
   g_get_current_time (&tv);
@@ -215,7 +217,7 @@ test_async_queue_timed (void)
   end = g_get_monotonic_time ();
   diff = end - start;
   g_assert_cmpint (diff, >=, G_USEC_PER_SEC / 10);
-  g_assert_cmpint (diff, <, G_USEC_PER_SEC);
+  g_assert_cmpint (diff, <, 2 * G_USEC_PER_SEC);
 
   g_async_queue_unref (q);
 }

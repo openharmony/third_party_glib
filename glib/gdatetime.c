@@ -52,6 +52,7 @@
 #define _GNU_SOURCE 1
 #endif
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -79,6 +80,11 @@
 #ifndef G_OS_WIN32
 #include <sys/time.h>
 #include <time.h>
+#else
+#if defined (_MSC_VER) && (_MSC_VER < 1800)
+/* fallback implementation for isnan() on VS2012 and earlier */
+#define isnan _isnan
+#endif
 #endif /* !G_OS_WIN32 */
 
 /**
@@ -126,7 +132,7 @@ struct _GDateTime
   /* 1 is 0001-01-01 in Proleptic Gregorian */
   gint32 days;
 
-  volatile gint ref_count;
+  gint ref_count;  /* (atomic) */
 };
 
 /* Time conversion {{{1 */
@@ -598,7 +604,7 @@ ymd_to_days (gint year,
 {
   gint64 days;
 
-  days = (year - 1) * 365 + ((year - 1) / 4) - ((year - 1) / 100)
+  days = ((gint64) year - 1) * 365 + ((year - 1) / 4) - ((year - 1) / 100)
       + ((year - 1) / 400);
 
   days += days_in_year[0][month - 1];
@@ -928,21 +934,20 @@ g_date_time_new_from_unix (GTimeZone *tz,
 }
 
 /**
- * g_date_time_new_now:
+ * g_date_time_new_now: (constructor)
  * @tz: a #GTimeZone
  *
  * Creates a #GDateTime corresponding to this exact instant in the given
  * time zone @tz.  The time is as accurate as the system allows, to a
  * maximum accuracy of 1 microsecond.
  *
- * This function will always succeed unless the system clock is set to
- * truly insane values (or unless GLib is still being used after the
- * year 9999).
+ * This function will always succeed unless GLib is still being used after the
+ * year 9999.
  *
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -957,7 +962,7 @@ g_date_time_new_now (GTimeZone *tz)
 }
 
 /**
- * g_date_time_new_now_local:
+ * g_date_time_new_now_local: (constructor)
  *
  * Creates a #GDateTime corresponding to this exact instant in the local
  * time zone.
@@ -965,7 +970,7 @@ g_date_time_new_now (GTimeZone *tz)
  * This is equivalent to calling g_date_time_new_now() with the time
  * zone returned by g_time_zone_new_local().
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -983,14 +988,14 @@ g_date_time_new_now_local (void)
 }
 
 /**
- * g_date_time_new_now_utc:
+ * g_date_time_new_now_utc: (constructor)
  *
  * Creates a #GDateTime corresponding to this exact instant in UTC.
  *
  * This is equivalent to calling g_date_time_new_now() with the time
  * zone returned by g_time_zone_new_utc().
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1008,7 +1013,7 @@ g_date_time_new_now_utc (void)
 }
 
 /**
- * g_date_time_new_from_unix_local:
+ * g_date_time_new_from_unix_local: (constructor)
  * @t: the Unix time
  *
  * Creates a #GDateTime corresponding to the given Unix time @t in the
@@ -1023,7 +1028,7 @@ g_date_time_new_now_utc (void)
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1033,7 +1038,8 @@ g_date_time_new_from_unix_local (gint64 t)
   GDateTime *datetime;
   GTimeZone *local;
 
-  if (t > G_MAXINT64 / USEC_PER_SECOND)
+  if (t > G_MAXINT64 / USEC_PER_SECOND ||
+      t < G_MININT64 / USEC_PER_SECOND)
     return NULL;
 
   local = g_time_zone_new_local ();
@@ -1044,7 +1050,7 @@ g_date_time_new_from_unix_local (gint64 t)
 }
 
 /**
- * g_date_time_new_from_unix_utc:
+ * g_date_time_new_from_unix_utc: (constructor)
  * @t: the Unix time
  *
  * Creates a #GDateTime corresponding to the given Unix time @t in UTC.
@@ -1058,7 +1064,7 @@ g_date_time_new_from_unix_local (gint64 t)
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1068,7 +1074,8 @@ g_date_time_new_from_unix_utc (gint64 t)
   GDateTime *datetime;
   GTimeZone *utc;
 
-  if (t > G_MAXINT64 / USEC_PER_SECOND)
+  if (t > G_MAXINT64 / USEC_PER_SECOND ||
+      t < G_MININT64 / USEC_PER_SECOND)
     return NULL;
 
   utc = g_time_zone_new_utc ();
@@ -1079,7 +1086,7 @@ g_date_time_new_from_unix_utc (gint64 t)
 }
 
 /**
- * g_date_time_new_from_timeval_local:
+ * g_date_time_new_from_timeval_local: (constructor)
  * @tv: a #GTimeVal
  *
  * Creates a #GDateTime corresponding to the given #GTimeVal @tv in the
@@ -1095,7 +1102,7 @@ g_date_time_new_from_unix_utc (gint64 t)
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  * Deprecated: 2.62: #GTimeVal is not year-2038-safe. Use
@@ -1117,7 +1124,7 @@ g_date_time_new_from_timeval_local (const GTimeVal *tv)
 G_GNUC_END_IGNORE_DEPRECATIONS
 
 /**
- * g_date_time_new_from_timeval_utc:
+ * g_date_time_new_from_timeval_utc: (constructor)
  * @tv: a #GTimeVal
  *
  * Creates a #GDateTime corresponding to the given #GTimeVal @tv in UTC.
@@ -1131,7 +1138,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  * Deprecated: 2.62: #GTimeVal is not year-2038-safe. Use
@@ -1179,7 +1186,7 @@ static gboolean
 get_iso8601_seconds (const gchar *text, gsize length, gdouble *value)
 {
   gsize i;
-  gdouble divisor = 1, v = 0;
+  guint64 divisor = 1, v = 0;
 
   if (length < 2)
     return FALSE;
@@ -1206,13 +1213,15 @@ get_iso8601_seconds (const gchar *text, gsize length, gdouble *value)
   for (; i < length; i++)
     {
       const gchar c = text[i];
-      if (c < '0' || c > '9')
+      if (c < '0' || c > '9' ||
+          v > (G_MAXUINT64 - (c - '0')) / 10 ||
+          divisor > G_MAXUINT64 / 10)
         return FALSE;
       v = v * 10 + (c - '0');
       divisor *= 10;
     }
 
-  *value = v / divisor;
+  *value = (gdouble) v / divisor;
   return TRUE;
 }
 
@@ -1382,15 +1391,15 @@ parse_iso8601_timezone (const gchar *text, gsize length, gssize *tz_offset)
     return NULL;
 
   *tz_offset = i;
-  tz = g_time_zone_new (text + i);
+  tz = g_time_zone_new_identifier (text + i);
 
   /* Double-check that the GTimeZone matches our interpretation of the timezone.
    * This can fail because our interpretation is less strict than (for example)
    * parse_time() in gtimezone.c, which restricts the range of the parsed
    * integers. */
-  if (g_time_zone_get_offset (tz, 0) != offset_sign * (offset_hours * 3600 + offset_minutes * 60))
+  if (tz == NULL || g_time_zone_get_offset (tz, 0) != offset_sign * (offset_hours * 3600 + offset_minutes * 60))
     {
-      g_time_zone_unref (tz);
+      g_clear_pointer (&tz, g_time_zone_unref);
       return NULL;
     }
 
@@ -1427,20 +1436,24 @@ parse_iso8601_time (const gchar *text, gsize length,
 }
 
 /**
- * g_date_time_new_from_iso8601:
+ * g_date_time_new_from_iso8601: (constructor)
  * @text: an ISO 8601 formatted time string.
  * @default_tz: (nullable): a #GTimeZone to use if the text doesn't contain a
  *                          timezone, or %NULL.
  *
  * Creates a #GDateTime corresponding to the given
  * [ISO 8601 formatted string](https://en.wikipedia.org/wiki/ISO_8601)
- * @text. ISO 8601 strings of the form <date><sep><time><tz> are supported.
+ * @text. ISO 8601 strings of the form <date><sep><time><tz> are supported, with
+ * some extensions from [RFC 3339](https://tools.ietf.org/html/rfc3339) as
+ * mentioned below.
  *
  * Note that as #GDateTime "is oblivious to leap seconds", leap seconds information
  * in an ISO-8601 string will be ignored, so a `23:59:60` time would be parsed as
  * `23:59:59`.
  *
- * <sep> is the separator and can be either 'T', 't' or ' '.
+ * <sep> is the separator and can be either 'T', 't' or ' '. The latter two
+ * separators are an extension from
+ * [RFC 3339](https://tools.ietf.org/html/rfc3339#section-5.6).
  *
  * <date> is in the form:
  *
@@ -1514,7 +1527,7 @@ out:
 /* full new functions {{{1 */
 
 /**
- * g_date_time_new:
+ * g_date_time_new: (constructor)
  * @tz: a #GTimeZone
  * @year: the year component of the date
  * @month: the month component of the date
@@ -1552,7 +1565,7 @@ out:
  * You should release the return value by calling g_date_time_unref()
  * when you are done with it.
  *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a new #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1580,6 +1593,7 @@ g_date_time_new (GTimeZone *tz,
       day < 1 || day > days_in_months[GREGORIAN_LEAP (year)][month] ||
       hour < 0 || hour > 23 ||
       minute < 0 || minute > 59 ||
+      isnan (seconds) ||
       seconds < 0.0 || seconds >= 60.0)
     return NULL;
 
@@ -1619,7 +1633,7 @@ g_date_time_new (GTimeZone *tz,
 }
 
 /**
- * g_date_time_new_local:
+ * g_date_time_new_local: (constructor)
  * @year: the year component of the date
  * @month: the month component of the date
  * @day: the day component of the date
@@ -1633,7 +1647,7 @@ g_date_time_new (GTimeZone *tz,
  * This call is equivalent to calling g_date_time_new() with the time
  * zone returned by g_time_zone_new_local().
  *
- * Returns: a #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1656,7 +1670,7 @@ g_date_time_new_local (gint    year,
 }
 
 /**
- * g_date_time_new_utc:
+ * g_date_time_new_utc: (constructor)
  * @year: the year component of the date
  * @month: the month component of the date
  * @day: the day component of the date
@@ -1670,7 +1684,7 @@ g_date_time_new_local (gint    year,
  * This call is equivalent to calling g_date_time_new() with the time
  * zone returned by g_time_zone_new_utc().
  *
- * Returns: a #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): a #GDateTime, or %NULL
  *
  * Since: 2.26
  **/
@@ -1701,8 +1715,8 @@ g_date_time_new_utc (gint    year,
  *
  * Creates a copy of @datetime and adds the specified timespan to the copy.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1710,6 +1724,8 @@ GDateTime*
 g_date_time_add (GDateTime *datetime,
                  GTimeSpan  timespan)
 {
+  g_return_val_if_fail (datetime != NULL, NULL);
+
   return g_date_time_from_instant (datetime->tz, timespan +
                                    g_date_time_to_instant (datetime));
 }
@@ -1725,8 +1741,8 @@ g_date_time_add (GDateTime *datetime,
  * As with g_date_time_add_months(), if the resulting date would be 29th
  * February on a non-leap year, the day will be clamped to 28th February.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1765,8 +1781,8 @@ g_date_time_add_years (GDateTime *datetime,
  * 31st January 2018, the result would be 28th February 2018. In 2020 (a leap
  * year), the result would be 29th February.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1808,8 +1824,8 @@ g_date_time_add_months (GDateTime *datetime,
  * Creates a copy of @datetime and adds the specified number of weeks to the
  * copy. Add negative values to subtract weeks.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1830,8 +1846,8 @@ g_date_time_add_weeks (GDateTime *datetime,
  * Creates a copy of @datetime and adds the specified number of days to the
  * copy. Add negative values to subtract days.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1855,8 +1871,8 @@ g_date_time_add_days (GDateTime *datetime,
  * Creates a copy of @datetime and adds the specified number of hours.
  * Add negative values to subtract hours.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1875,8 +1891,8 @@ g_date_time_add_hours (GDateTime *datetime,
  * Creates a copy of @datetime adding the specified number of minutes.
  * Add negative values to subtract minutes.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1896,8 +1912,8 @@ g_date_time_add_minutes (GDateTime *datetime,
  * Creates a copy of @datetime and adds the specified number of seconds.
  * Add negative values to subtract seconds.
  *
- * Returns: the newly created #GDateTime which should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -1921,8 +1937,8 @@ g_date_time_add_seconds (GDateTime *datetime,
  * Creates a new #GDateTime adding the specified values to the current date and
  * time in @datetime. Add negative values to subtract.
  *
- * Returns: the newly created #GDateTime that should be freed with
- *   g_date_time_unref().
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  */
@@ -2011,8 +2027,8 @@ g_date_time_add_full (GDateTime *datetime,
 /* Compare, difference, hash, equal {{{1 */
 /**
  * g_date_time_compare:
- * @dt1: (not nullable): first #GDateTime to compare
- * @dt2: (not nullable): second #GDateTime to compare
+ * @dt1: (type GDateTime) (not nullable): first #GDateTime to compare
+ * @dt2: (type GDateTime) (not nullable): second #GDateTime to compare
  *
  * A comparison function for #GDateTimes that is suitable
  * as a #GCompareFunc. Both #GDateTimes must be non-%NULL.
@@ -2067,7 +2083,7 @@ g_date_time_difference (GDateTime *end,
 
 /**
  * g_date_time_hash:
- * @datetime: (not nullable): a #GDateTime
+ * @datetime: (type GDateTime) (not nullable): a #GDateTime
  *
  * Hashes @datetime into a #guint, suitable for use within #GHashTable.
  *
@@ -2078,13 +2094,15 @@ g_date_time_difference (GDateTime *end,
 guint
 g_date_time_hash (gconstpointer datetime)
 {
+  g_return_val_if_fail (datetime != NULL, 0);
+
   return g_date_time_to_instant ((GDateTime *) datetime);
 }
 
 /**
  * g_date_time_equal:
- * @dt1: (not nullable): a #GDateTime
- * @dt2: (not nullable): a #GDateTime
+ * @dt1: (type GDateTime) (not nullable): a #GDateTime
+ * @dt2: (type GDateTime) (not nullable): a #GDateTime
  *
  * Checks to see if @dt1 and @dt2 are equal.
  *
@@ -2545,6 +2563,8 @@ g_date_time_get_seconds (GDateTime *datetime)
 gint64
 g_date_time_to_unix (GDateTime *datetime)
 {
+  g_return_val_if_fail (datetime != NULL, 0);
+
   return INSTANT_TO_UNIX (g_date_time_to_instant (datetime));
 }
 
@@ -2578,6 +2598,8 @@ gboolean
 g_date_time_to_timeval (GDateTime *datetime,
                         GTimeVal  *tv)
 {
+  g_return_val_if_fail (datetime != NULL, FALSE);
+
   tv->tv_sec = INSTANT_TO_UNIX (g_date_time_to_instant (datetime));
   tv->tv_usec = datetime->usec % USEC_PER_SECOND;
 
@@ -2691,10 +2713,8 @@ g_date_time_is_daylight_savings (GDateTime *datetime)
  * example, converting 0001-01-01 00:00:00 UTC to a time zone west of
  * Greenwich will fail (due to the year 0 being out of range).
  *
- * You should release the return value by calling g_date_time_unref()
- * when you are done with it.
- *
- * Returns: a new #GDateTime, or %NULL
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  **/
@@ -2702,6 +2722,9 @@ GDateTime *
 g_date_time_to_timezone (GDateTime *datetime,
                          GTimeZone *tz)
 {
+  g_return_val_if_fail (datetime != NULL, NULL);
+  g_return_val_if_fail (tz != NULL, NULL);
+
   return g_date_time_from_instant (tz, g_date_time_to_instant (datetime));
 }
 
@@ -2715,7 +2738,8 @@ g_date_time_to_timezone (GDateTime *datetime,
  * This call is equivalent to calling g_date_time_to_timezone() with the
  * time zone returned by g_time_zone_new_local().
  *
- * Returns: the newly created #GDateTime
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  **/
@@ -2742,7 +2766,8 @@ g_date_time_to_local (GDateTime *datetime)
  * This call is equivalent to calling g_date_time_to_timezone() with the
  * time zone returned by g_time_zone_new_utc().
  *
- * Returns: the newly created #GDateTime
+ * Returns: (transfer full) (nullable): the newly created #GDateTime which
+ *   should be freed with g_date_time_unref(), or %NULL
  *
  * Since: 2.26
  **/
@@ -3118,6 +3143,10 @@ g_date_time_format_utf8 (GDateTime   *datetime,
 	  format_number (outstr, alt_digits, pad_set ? pad : " ", 2,
 			 g_date_time_get_day_of_month (datetime));
 	  break;
+	case 'f':
+	  g_string_append_printf (outstr, "%06" G_GUINT64_FORMAT,
+			datetime->usec % G_TIME_SPAN_SECOND);
+	  break;
 	case 'F':
 	  g_string_append_printf (outstr, "%d-%02d-%02d",
 				  g_date_time_get_year (datetime),
@@ -3166,9 +3195,6 @@ g_date_time_format_utf8 (GDateTime   *datetime,
 	  format_number (outstr, alt_digits, pad_set ? pad : " ", 2,
 			 (g_date_time_get_hour (datetime) + 11) % 12 + 1);
 	  break;
-	case 'n':
-	  g_string_append_c (outstr, '\n');
-	  break;
 	case 'm':
 	  format_number (outstr, alt_digits, pad_set ? pad : "0", 2,
 			 g_date_time_get_month (datetime));
@@ -3176,6 +3202,9 @@ g_date_time_format_utf8 (GDateTime   *datetime,
 	case 'M':
 	  format_number (outstr, alt_digits, pad_set ? pad : "0", 2,
 			 g_date_time_get_minute (datetime));
+	  break;
+	case 'n':
+	  g_string_append_c (outstr, '\n');
 	  break;
 	case 'O':
 	  alt_digits = TRUE;
@@ -3309,7 +3338,7 @@ g_date_time_format_utf8 (GDateTime   *datetime,
  * strftime() format language as specified by C99.  The \%D, \%U and \%W
  * conversions are not supported, nor is the 'E' modifier.  The GNU
  * extensions \%k, \%l, \%s and \%P are supported, however, as are the
- * '0', '_' and '-' modifiers.
+ * '0', '_' and '-' modifiers. The Python extension \%f is also supported.
  *
  * In contrast to strftime(), this function always produces a UTF-8
  * string, regardless of the current locale.  Note that the rendering of
@@ -3341,12 +3370,17 @@ g_date_time_format_utf8 (GDateTime   *datetime,
  *   single digits are preceded by a blank
  * - \%m: the month as a decimal number (range 01 to 12)
  * - \%M: the minute as a decimal number (range 00 to 59)
+ * - \%f: the microsecond as a decimal number (range 000000 to 999999)
  * - \%p: either "AM" or "PM" according to the given time value, or the
  *   corresponding  strings for the current locale.  Noon is treated as
- *   "PM" and midnight as "AM".
+ *   "PM" and midnight as "AM". Use of this format specifier is discouraged, as
+ *   many locales have no concept of AM/PM formatting. Use \%c or \%X instead.
  * - \%P: like \%p but lowercase: "am" or "pm" or a corresponding string for
- *   the current locale
- * - \%r: the time in a.m. or p.m. notation
+ *   the current locale. Use of this format specifier is discouraged, as
+ *   many locales have no concept of AM/PM formatting. Use \%c or \%X instead.
+ * - \%r: the time in a.m. or p.m. notation. Use of this format specifier is
+ *   discouraged, as many locales have no concept of AM/PM formatting. Use \%c
+ *   or \%X instead.
  * - \%R: the time in 24-hour notation (\%H:\%M)
  * - \%s: the number of seconds since the Epoch, that is, since 1970-01-01
  *   00:00:00 UTC
@@ -3381,7 +3415,7 @@ g_date_time_format_utf8 (GDateTime   *datetime,
  * conversion specifier by one or more modifier characters. The
  * following modifiers are supported for many of the numeric
  * conversions:
- * 
+ *
  * - O: Use alternative numeric symbols, if the current locale supports those.
  * - _: Pad a numeric result with spaces. This overrides the default padding
  *   for the specifier.
@@ -3398,10 +3432,10 @@ g_date_time_format_utf8 (GDateTime   *datetime,
  * strftime() extension expected to be added to the future POSIX specification,
  * \%Ob and \%Oh are GNU strftime() extensions. Since: 2.56
  *
- * Returns: a newly allocated string formatted to the requested format
- *     or %NULL in the case that there was an error (such as a format specifier
- *     not being supported in the current locale). The string
- *     should be freed with g_free().
+ * Returns: (transfer full) (nullable): a newly allocated string formatted to
+ *    the requested format or %NULL in the case that there was an error (such
+ *    as a format specifier not being supported in the current locale). The
+ *    string should be freed with g_free().
  *
  * Since: 2.26
  */
@@ -3442,9 +3476,12 @@ g_date_time_format (GDateTime   *datetime,
  * including the date, time and time zone, and return that as a UTF-8 encoded
  * string.
  *
- * Returns: a newly allocated string formatted in ISO 8601 format
- *     or %NULL in the case that there was an error. The string
- *     should be freed with g_free().
+ * Since GLib 2.66, this will output to sub-second precision if needed.
+ *
+ * Returns: (transfer full) (nullable): a newly allocated string formatted in
+ *   ISO 8601 format or %NULL in the case that there was an error. The string
+ *   should be freed with g_free().
+ *
  * Since: 2.62
  */
 gchar *
@@ -3453,9 +3490,15 @@ g_date_time_format_iso8601 (GDateTime *datetime)
   GString *outstr = NULL;
   gchar *main_date = NULL;
   gint64 offset;
+  gchar *format = "%Y-%m-%dT%H:%M:%S";
+
+  /* if datetime has sub-second non-zero values below the second precision we
+   * should print them as well */
+  if (datetime->usec % G_TIME_SPAN_SECOND != 0)
+    format = "%Y-%m-%dT%H:%M:%S.%f";
 
   /* Main date and time. */
-  main_date = g_date_time_format (datetime, "%Y-%m-%dT%H:%M:%S");
+  main_date = g_date_time_format (datetime, format);
   outstr = g_string_new (main_date);
   g_free (main_date);
 

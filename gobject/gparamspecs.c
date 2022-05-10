@@ -24,7 +24,9 @@
 
 #include <string.h>
 
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include "gparamspecs.h"
 #include "gtype-private.h"
@@ -912,8 +914,11 @@ param_value_array_validate (GParamSpec *pspec,
 		  g_param_value_set_default (element_spec, element);
 		  changed++;
 		}
-	      /* validate array value against element_spec */
-	      changed += g_param_value_validate (element_spec, element);
+              else
+                {
+	          /* validate array value against element_spec */
+	          changed += g_param_value_validate (element_spec, element);
+                }
 	    }
 	}
     }
@@ -2092,7 +2097,10 @@ g_param_spec_enum (const gchar *name,
 				 blurb,
 				 flags);
   if (espec == NULL)
-    return NULL;
+    {
+      g_type_class_unref (enum_class);
+      return NULL;
+    }
   
   espec->enum_class = enum_class;
   espec->default_value = default_value;
@@ -2140,7 +2148,10 @@ g_param_spec_flags (const gchar *name,
 				 blurb,
 				 flags);
   if (fspec == NULL)
-    return NULL;
+    {
+      g_type_class_unref (flags_class);
+      return NULL;
+    }
   
   fspec->flags_class = flags_class;
   fspec->default_value = default_value;

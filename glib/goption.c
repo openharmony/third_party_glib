@@ -241,7 +241,7 @@ struct _GOptionContext
 {
   GList           *groups;
 
-  gchar           *parameter_string;
+  gchar           *parameter_string;  /* (nullable) */
   gchar           *summary;
   gchar           *description;
 
@@ -363,6 +363,11 @@ g_option_context_new (const gchar *parameter_string)
   GOptionContext *context;
 
   context = g_new0 (GOptionContext, 1);
+
+  /* Clear the empty string to NULL, otherwise we end up calling gettext(""),
+   * which returns the translation header. */
+  if (parameter_string != NULL && *parameter_string == '\0')
+    parameter_string = NULL;
 
   context->parameter_string = g_strdup (parameter_string);
   context->strict_posix = FALSE;
@@ -640,7 +645,7 @@ g_option_context_get_main_group (GOptionContext *context)
 /**
  * g_option_context_add_main_entries:
  * @context: a #GOptionContext
- * @entries: a %NULL-terminated array of #GOptionEntrys
+ * @entries: (array zero-terminated=1): a %NULL-terminated array of #GOptionEntrys
  * @translation_domain: (nullable): a translation domain to use for translating
  *    the `--help` output for the options in @entries
  *    with gettext(), or %NULL
@@ -1086,7 +1091,7 @@ g_option_context_get_help (GOptionContext *context,
   return g_string_free (string, FALSE);
 }
 
-G_GNUC_NORETURN
+G_NORETURN
 static void
 print_help (GOptionContext *context,
             gboolean        main_help,
@@ -2400,7 +2405,7 @@ g_option_group_unref (GOptionGroup *group)
 /**
  * g_option_group_add_entries:
  * @group: a #GOptionGroup
- * @entries: a %NULL-terminated array of #GOptionEntrys
+ * @entries: (array zero-terminated=1): a %NULL-terminated array of #GOptionEntrys
  *
  * Adds the options specified in @entries to @group.
  *

@@ -49,7 +49,7 @@
  * its type nor its content can be modified further.
  *
  * GVariant is useful whenever data needs to be serialized, for example when
- * sending method parameters in DBus, or when saving settings using GSettings.
+ * sending method parameters in D-Bus, or when saving settings using GSettings.
  *
  * When creating a new #GVariant, you pass the data you want to store in it
  * along with a string representing the type of data you wish to pass to it.
@@ -725,7 +725,7 @@ g_variant_new_variant (GVariant *value)
   g_variant_ref_sink (value);
 
   return g_variant_new_from_children (G_VARIANT_TYPE_VARIANT,
-                                      g_memdup (&value, sizeof value),
+                                      g_memdup2 (&value, sizeof value),
                                       1, g_variant_is_trusted (value));
 }
 
@@ -1229,7 +1229,7 @@ g_variant_new_fixed_array (const GVariantType  *element_type,
       return NULL;
     }
 
-  data = g_memdup (elements, n_elements * element_size);
+  data = g_memdup2 (elements, n_elements * element_size);
   value = g_variant_new_from_data (array_type, data,
                                    n_elements * element_size,
                                    FALSE, g_free, data);
@@ -1440,11 +1440,15 @@ g_variant_is_signature (const gchar *string)
  * type.  This includes the types %G_VARIANT_TYPE_STRING,
  * %G_VARIANT_TYPE_OBJECT_PATH and %G_VARIANT_TYPE_SIGNATURE.
  *
- * The string will always be UTF-8 encoded, and will never be %NULL.
+ * The string will always be UTF-8 encoded, will never be %NULL, and will never
+ * contain nul bytes.
  *
  * If @length is non-%NULL then the length of the string (in bytes) is
  * returned there.  For trusted values, this information is already
- * known.  For untrusted values, a strlen() will be performed.
+ * known.  Untrusted values will be validated and, if valid, a strlen() will be
+ * performed. If invalid, a default value will be returned — for
+ * %G_VARIANT_TYPE_OBJECT_PATH, this is `"/"`, and for other types it is the
+ * empty string.
  *
  * It is an error to call this function with a @value of any type
  * other than those three.
@@ -1908,7 +1912,7 @@ g_variant_dup_bytestring (GVariant *value,
   if (length)
     *length = size;
 
-  return g_memdup (original, size + 1);
+  return g_memdup2 (original, size + 1);
 }
 
 /**
@@ -2765,7 +2769,10 @@ g_variant_equal (gconstpointer one,
       data_one = g_variant_get_data ((GVariant *) one);
       data_two = g_variant_get_data ((GVariant *) two);
 
-      equal = memcmp (data_one, data_two, size_one) == 0;
+      if (size_one)
+        equal = memcmp (data_one, data_two, size_one) == 0;
+      else
+        equal = TRUE;
     }
   else
     {
@@ -3001,7 +3008,7 @@ g_variant_iter_init (GVariantIter *iter,
  * need it.
  *
  * A reference is taken to the container that @iter is iterating over
- * and will be releated only when g_variant_iter_free() is called.
+ * and will be related only when g_variant_iter_free() is called.
  *
  * Returns: (transfer full): a new heap-allocated #GVariantIter
  *
@@ -4282,7 +4289,7 @@ g_variant_format_string_scan (const gchar  *string,
                               const gchar  *limit,
                               const gchar **endptr)
 {
-#define next_char() (string == limit ? '\0' : *string++)
+#define next_char() (string == limit ? '\0' : *(string++))
 #define peek_char() (string == limit ? '\0' : *string)
   char c;
 
@@ -4463,7 +4470,7 @@ g_variant_check_format_string (GVariant    *value,
               return FALSE;
             }
 
-          /* fall through */
+          G_GNUC_FALLTHROUGH;
         case '^':
         case '@':
           /* ignore these 2 (or 3) */
@@ -4484,7 +4491,7 @@ g_variant_check_format_string (GVariant    *value,
           if (*type_string != '(')
             return FALSE;
 
-          /* fall through */
+          G_GNUC_FALLTHROUGH;
         case '*':
           /* consume a full type string for the '*' or 'r' */
           if (!g_variant_type_string_scan (type_string, NULL, &type_string))
@@ -4923,7 +4930,7 @@ g_variant_valist_get_nnp (const gchar **str,
 
     case '@':
       g_variant_type_string_scan (*str, NULL, str);
-      /* fall through */
+      G_GNUC_FALLTHROUGH;
 
     case '*':
     case '?':
@@ -5431,6 +5438,7 @@ g_variant_get (GVariant    *value,
 {
   va_list ap;
 
+  g_return_if_fail (value != NULL);
   g_return_if_fail (valid_format_string (format_string, TRUE, value));
 
   /* if any direct-pointer-access formats are in use, flatten first */
@@ -5944,6 +5952,7 @@ g_variant_byteswap (GVariant *value)
       serialised.type_info = g_variant_get_type_info (trusted);
       serialised.size = g_variant_get_size (trusted);
       serialised.data = g_malloc (serialised.size);
+      serialised.depth = g_variant_get_depth (trusted);
       g_variant_store (trusted, serialised.data);
       g_variant_unref (trusted);
 

@@ -165,12 +165,13 @@ typedef unsigned int guintptr;
 
 
 #define GLIB_MAJOR_VERSION 2
-#define GLIB_MINOR_VERSION 62
-#define GLIB_MICRO_VERSION 5
+#define GLIB_MINOR_VERSION 68
+#define GLIB_MICRO_VERSION 1
 
 #define G_OS_UNIX
 
 #define G_VA_COPY va_copy
+#define G_VA_COPY_AS_ARRAY 1
 
 
 #ifndef __cplusplus
