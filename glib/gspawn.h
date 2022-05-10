@@ -157,7 +157,7 @@ typedef void (* GSpawnChildSetupFunc) (gpointer user_data);
  *     execute, while the remaining elements are the actual argument vector
  *     to pass to the file. Normally g_spawn_async_with_pipes() uses `argv[0]`
  *     as the file to execute, and passes all of `argv` to the child.
- * @G_SPAWN_SEARCH_PATH_FROM_ENVP: if `argv[0]` is not an abolute path,
+ * @G_SPAWN_SEARCH_PATH_FROM_ENVP: if `argv[0]` is not an absolute path,
  *     it will be looked for in the `PATH` from the passed child environment.
  *     Since: 2.34
  * @G_SPAWN_CLOEXEC_PIPES: create all pipes with the `O_CLOEXEC` flag set.
@@ -212,6 +212,25 @@ gboolean g_spawn_async_with_pipes (const gchar          *working_directory,
                                    gint                 *standard_output,
                                    gint                 *standard_error,
                                    GError              **error);
+
+GLIB_AVAILABLE_IN_2_68
+gboolean g_spawn_async_with_pipes_and_fds (const gchar          *working_directory,
+                                           const gchar * const  *argv,
+                                           const gchar * const  *envp,
+                                           GSpawnFlags           flags,
+                                           GSpawnChildSetupFunc  child_setup,
+                                           gpointer              user_data,
+                                           gint                  stdin_fd,
+                                           gint                  stdout_fd,
+                                           gint                  stderr_fd,
+                                           const gint           *source_fds,
+                                           const gint           *target_fds,
+                                           gsize                 n_fds,
+                                           GPid                 *child_pid_out,
+                                           gint                 *stdin_pipe_out,
+                                           gint                 *stdout_pipe_out,
+                                           gint                 *stderr_pipe_out,
+                                           GError              **error);
 
 /* Lets you provide fds for stdin/stdout/stderr */
 GLIB_AVAILABLE_IN_2_58

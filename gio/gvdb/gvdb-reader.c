@@ -351,10 +351,10 @@ gvdb_table_get_names (GvdbTable *table,
                       gsize     *length)
 {
   gchar **names;
-  gint n_names;
-  gint filled;
-  gint total;
-  gint i;
+  guint n_names;
+  guint filled;
+  guint total;
+  guint i;
 
   /* We generally proceed by iterating over the list of items in the
    * hash table (in order of appearance) recording them into an array.
@@ -379,7 +379,7 @@ gvdb_table_get_names (GvdbTable *table,
    * a pass that fills in no additional items.
    *
    * This takes an O(n) algorithm and turns it into O(n*m) where m is
-   * the depth of the tree, but in all sane cases the tree won't be very
+   * the depth of the tree, but typically the tree won't be very
    * deep and the constant factor of this algorithm is lower (and the
    * complexity of coding it, as well).
    */

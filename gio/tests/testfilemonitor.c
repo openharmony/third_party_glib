@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <gio/gio.h>
 
+#include "glib/glib-private.h"
+
 /* These tests were written for the inotify implementation.
  * Other implementations may require slight adjustments in
  * the tests, e.g. the length of timeouts
@@ -27,6 +29,8 @@ setup (Fixture       *fixture,
   fixture->tmp_dir = g_file_new_for_path (path);
 
   g_test_message ("Using temporary directory: %s", path);
+
+  g_free (path);
 }
 
 static void
@@ -952,6 +956,11 @@ static void
 test_file_hard_links (Fixture       *fixture,
                       gconstpointer  user_data)
 {
+#ifdef _GLIB_ADDRESS_SANITIZER
+  g_test_incomplete ("FIXME: Leaks an inotify data structure, see glib#2311");
+  (void) file_hard_links_output;
+  (void) file_hard_links_step;
+#else
   GError *error = NULL;
   TestData data;
 
@@ -1002,6 +1011,7 @@ test_file_hard_links (Fixture       *fixture,
   g_object_unref (data.monitor);
   g_object_unref (data.file);
   g_object_unref (data.output_stream);
+#endif
 }
 
 int

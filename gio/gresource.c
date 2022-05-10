@@ -32,6 +32,8 @@
 #include <gio/gzlibdecompressor.h>
 #include <gio/gconverterinputstream.h>
 
+#include "glib-private.h"
+
 struct _GResource
 {
   int ref_count;
@@ -76,12 +78,23 @@ G_DEFINE_BOXED_TYPE (GResource, g_resource, g_resource_ref, g_resource_unref)
  * the xmllint executable, or xmllint must be in the `PATH`; otherwise
  * the preprocessing step is skipped.
  *
- * `to-pixdata` which will use the gdk-pixbuf-pixdata command to convert
- * images to the GdkPixdata format, which allows you to create pixbufs directly using the data inside
- * the resource file, rather than an (uncompressed) copy of it. For this, the gdk-pixbuf-pixdata
- * program must be in the PATH, or the `GDK_PIXBUF_PIXDATA` environment variable must be
- * set to the full path to the gdk-pixbuf-pixdata executable; otherwise the resource compiler will
- * abort.
+ * `to-pixdata` (deprecated since gdk-pixbuf 2.32) which will use the
+ * `gdk-pixbuf-pixdata` command to convert images to the #GdkPixdata format,
+ * which allows you to create pixbufs directly using the data inside the
+ * resource file, rather than an (uncompressed) copy of it. For this, the
+ * `gdk-pixbuf-pixdata` program must be in the `PATH`, or the
+ * `GDK_PIXBUF_PIXDATA` environment variable must be set to the full path to the
+ * `gdk-pixbuf-pixdata` executable; otherwise the resource compiler will abort.
+ * `to-pixdata` has been deprecated since gdk-pixbuf 2.32, as #GResource
+ * supports embedding modern image formats just as well. Instead of using it,
+ * embed a PNG or SVG file in your #GResource.
+ *
+ * `json-stripblanks` which will use the `json-glib-format` command to strip
+ * ignorable whitespace from the JSON file. For this to work, the
+ * `JSON_GLIB_FORMAT` environment variable must be set to the full path to the
+ * `json-glib-format` executable, or it must be in the `PATH`;
+ * otherwise the preprocessing step is skipped. In addition, at least version
+ * 1.6 of `json-glib-format` is required.
  *
  * Resource files will be exported in the GResource namespace using the
  * combination of the given `prefix` and the filename from the `file` element.
@@ -152,7 +165,7 @@ G_DEFINE_BOXED_TYPE (GResource, g_resource, g_resource_ref, g_resource_unref)
  * replace resources in the program or library, without recompiling, for debugging or quick hacking and testing
  * purposes. Since GLib 2.50, it is possible to use the `G_RESOURCE_OVERLAYS` environment variable to selectively overlay
  * resources with replacements from the filesystem.  It is a %G_SEARCHPATH_SEPARATOR-separated list of substitutions to perform
- * during resource lookups.
+ * during resource lookups. It is ignored when running in a setuid process.
  *
  * A substitution has the form
  *
@@ -323,10 +336,13 @@ g_resource_find_overlay (const gchar    *path,
 
   if (g_once_init_enter (&overlay_dirs))
     {
+      gboolean is_setuid = GLIB_PRIVATE_CALL (g_check_setuid) ();
       const gchar * const *result;
       const gchar *envvar;
 
-      envvar = g_getenv ("G_RESOURCE_OVERLAYS");
+      /* Don’t load overlays if setuid, as they could allow reading privileged
+       * files. */
+      envvar = !is_setuid ? g_getenv ("G_RESOURCE_OVERLAYS") : NULL;
       if (envvar != NULL)
         {
           gchar **parts;
@@ -793,7 +809,9 @@ g_resource_lookup_data (GResource             *resource,
   if (!do_lookup (resource, path, lookup_flags, &size, &flags, &data, &data_size, error))
     return NULL;
 
-  if (flags & G_RESOURCE_FLAGS_COMPRESSED)
+  if (size == 0)
+    return g_bytes_new_with_free_func ("", 0, (GDestroyNotify) g_resource_unref, g_resource_ref (resource));
+  else if (flags & G_RESOURCE_FLAGS_COMPRESSED)
     {
       char *uncompressed, *d;
       const char *s;
@@ -920,9 +938,10 @@ g_resource_enumerate_children (GResource             *resource,
 
   if (*path == 0)
     {
-      g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
-                   _("The resource at “%s” does not exist"),
-                   path);
+      if (error)
+        g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
+                     _("The resource at “%s” does not exist"),
+                     path);
       return NULL;
     }
 
@@ -959,9 +978,10 @@ g_resource_enumerate_children (GResource             *resource,
 
   if (children == NULL)
     {
-      g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
-                   _("The resource at “%s” does not exist"),
-                   path);
+      if (error)
+        g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
+                     _("The resource at “%s” does not exist"),
+                     path);
       return NULL;
     }
 
@@ -1228,9 +1248,10 @@ g_resources_enumerate_children (const gchar           *path,
 
   if (hash == NULL)
     {
-      g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
-                   _("The resource at “%s” does not exist"),
-                   path);
+      if (error)
+        g_set_error (error, G_RESOURCE_ERROR, G_RESOURCE_ERROR_NOT_FOUND,
+                     _("The resource at “%s” does not exist"),
+                     path);
       return NULL;
     }
   else
@@ -1389,7 +1410,7 @@ register_lazy_static_resources (void)
 void
 g_static_resource_init (GStaticResource *static_resource)
 {
-  gpointer next;
+  GStaticResource *next;
 
   do
     {

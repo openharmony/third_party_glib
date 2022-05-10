@@ -23,7 +23,9 @@
  */
 
 /* We are testing some deprecated APIs here */
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include <locale.h>
 
@@ -331,6 +333,10 @@ test_unichar_script (void)
     { G_UNICODE_SCRIPT_NANDINAGARI,            0x119A0 },
     { G_UNICODE_SCRIPT_NYIAKENG_PUACHUE_HMONG, 0x1E100 },
     { G_UNICODE_SCRIPT_WANCHO,                 0x1E2C0 },
+    { G_UNICODE_SCRIPT_CHORASMIAN,             0x10FB0 },
+    { G_UNICODE_SCRIPT_DIVES_AKURU,            0x11900 },
+    { G_UNICODE_SCRIPT_KHITAN_SMALL_SCRIPT,    0x18B00 },
+    { G_UNICODE_SCRIPT_YEZIDI,                 0x10E80 },
   };
   for (i = 0; i < G_N_ELEMENTS (examples); i++)
     g_assert_cmpint (g_unichar_get_script (examples[i].c), ==, examples[i].script);
@@ -456,6 +462,47 @@ test_strdown (void)
   /* Tricky, comparing two unicode strings with an ASCII function */
   g_assert_cmpstr (str_down, ==, "aazz09x;\003\007\357\275\201\357\275\201");
   g_free (str_down);
+}
+
+/* Test that g_utf8_strup() and g_utf8_strdown() return the correct
+ * value for Turkish 'i' with and without dot above. */
+static void
+test_turkish_strupdown (void)
+{
+  char *str_up = NULL;
+  char *str_down = NULL;
+  const char *str = "iII"
+                    "\xcc\x87"  /* COMBINING DOT ABOVE (U+307) */
+                    "\xc4\xb1"  /* LATIN SMALL LETTER DOTLESS I (U+131) */
+                    "\xc4\xb0"; /* LATIN CAPITAL LETTER I WITH DOT ABOVE (U+130) */
+
+  char *oldlocale = g_strdup (setlocale (LC_ALL, "tr_TR"));
+
+  if (oldlocale == NULL)
+    {
+      g_test_skip ("locale tr_TR not available");
+      return;
+    }
+
+  str_up = g_utf8_strup (str, strlen (str));
+  str_down = g_utf8_strdown (str, strlen (str));
+  /* i => LATIN CAPITAL LETTER I WITH DOT ABOVE,
+   * I => I,
+   * I + COMBINING DOT ABOVE => I + COMBINING DOT ABOVE,
+   * LATIN SMALL LETTER DOTLESS I => I,
+   * LATIN CAPITAL LETTER I WITH DOT ABOVE => LATIN CAPITAL LETTER I WITH DOT ABOVE */
+  g_assert_cmpstr (str_up, ==, "\xc4\xb0II\xcc\x87I\xc4\xb0");
+  /* i => i,
+   * I => LATIN SMALL LETTER DOTLESS I,
+   * I + COMBINING DOT ABOVE => i,
+   * LATIN SMALL LETTER DOTLESS I => LATIN SMALL LETTER DOTLESS I,
+   * LATIN CAPITAL LETTER I WITH DOT ABOVE => i */
+  g_assert_cmpstr (str_down, ==, "i\xc4\xb1i\xc4\xb1i");
+  g_free (str_up);
+  g_free (str_down);
+
+  setlocale (LC_ALL, oldlocale);
+  g_free (oldlocale);
 }
 
 /* Test that g_utf8_casefold() returns the correct value for various
@@ -1567,6 +1614,12 @@ test_iso15924 (void)
     { G_UNICODE_SCRIPT_NANDINAGARI,            "Nand" },
     { G_UNICODE_SCRIPT_NYIAKENG_PUACHUE_HMONG, "Hmnp" },
     { G_UNICODE_SCRIPT_WANCHO,                 "Wcho" },
+
+    /* Unicode 13.0 additions */
+    { G_UNICODE_SCRIPT_CHORASMIAN,             "Chrs" },
+    { G_UNICODE_SCRIPT_DIVES_AKURU,            "Diak" },
+    { G_UNICODE_SCRIPT_KHITAN_SMALL_SCRIPT,    "Kits" },
+    { G_UNICODE_SCRIPT_YEZIDI,                 "Yezi" },
   };
   guint i;
 
@@ -1632,6 +1685,7 @@ main (int   argc,
   g_test_add_func ("/unicode/space", test_space);
   g_test_add_func ("/unicode/strdown", test_strdown);
   g_test_add_func ("/unicode/strup", test_strup);
+  g_test_add_func ("/unicode/turkish-strupdown", test_turkish_strupdown);
   g_test_add_func ("/unicode/title", test_title);
   g_test_add_func ("/unicode/upper", test_upper);
   g_test_add_func ("/unicode/validate", test_unichar_validate);

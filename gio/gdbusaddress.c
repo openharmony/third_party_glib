@@ -30,6 +30,7 @@
 #include "gdbusaddress.h"
 #include "gdbuserror.h"
 #include "gioenumtypes.h"
+#include "glib-private.h"
 #include "gnetworkaddress.h"
 #include "gsocketclient.h"
 #include "giostream.h"
@@ -244,8 +245,8 @@ is_valid_nonce_tcp (const gchar  *address_entry,
           g_set_error (error,
                        G_IO_ERROR,
                        G_IO_ERROR_INVALID_ARGUMENT,
-                       _("Error in address “%s” — the port attribute is malformed"),
-                       address_entry);
+                       _("Error in address “%s” — the “%s” attribute is malformed"),
+                       address_entry, "port");
           goto out;
         }
     }
@@ -255,8 +256,8 @@ is_valid_nonce_tcp (const gchar  *address_entry,
       g_set_error (error,
                    G_IO_ERROR,
                    G_IO_ERROR_INVALID_ARGUMENT,
-                   _("Error in address “%s” — the family attribute is malformed"),
-                   address_entry);
+                   _("Error in address “%s” — the “%s” attribute is malformed"),
+                   address_entry, "family");
       goto out;
     }
 
@@ -265,9 +266,17 @@ is_valid_nonce_tcp (const gchar  *address_entry,
       /* TODO: validate host */
     }
 
-  nonce_file = nonce_file; /* To avoid -Wunused-but-set-variable */
+  if (nonce_file != NULL && *nonce_file == '\0')
+    {
+      g_set_error (error,
+                   G_IO_ERROR,
+                   G_IO_ERROR_INVALID_ARGUMENT,
+                   _("Error in address “%s” — the “%s” attribute is malformed"),
+                   address_entry, "noncefile");
+      goto out;
+    }
 
-  ret= TRUE;
+  ret = TRUE;
 
  out:
   g_list_free (keys);
@@ -325,8 +334,8 @@ is_valid_tcp (const gchar  *address_entry,
           g_set_error (error,
                        G_IO_ERROR,
                        G_IO_ERROR_INVALID_ARGUMENT,
-                       _("Error in address “%s” — the port attribute is malformed"),
-                       address_entry);
+                       _("Error in address “%s” — the “%s” attribute is malformed"),
+                       address_entry, "port");
           goto out;
         }
     }
@@ -336,8 +345,8 @@ is_valid_tcp (const gchar  *address_entry,
       g_set_error (error,
                    G_IO_ERROR,
                    G_IO_ERROR_INVALID_ARGUMENT,
-                   _("Error in address “%s” — the family attribute is malformed"),
-                   address_entry);
+                   _("Error in address “%s” — the “%s” attribute is malformed"),
+                   address_entry, "family");
       goto out;
     }
 
@@ -895,10 +904,13 @@ g_dbus_address_get_stream (const gchar         *address,
 /**
  * g_dbus_address_get_stream_finish:
  * @res: A #GAsyncResult obtained from the GAsyncReadyCallback passed to g_dbus_address_get_stream().
- * @out_guid: (optional) (out): %NULL or return location to store the GUID extracted from @address, if any.
+ * @out_guid: (optional) (out) (nullable): %NULL or return location to store the GUID extracted from @address, if any.
  * @error: Return location for error or %NULL.
  *
  * Finishes an operation started with g_dbus_address_get_stream().
+ *
+ * A server is not required to set a GUID, so @out_guid may be set to %NULL
+ * even on success.
  *
  * Returns: (transfer full): A #GIOStream or %NULL if @error is set.
  *
@@ -932,7 +944,7 @@ g_dbus_address_get_stream_finish (GAsyncResult        *res,
 /**
  * g_dbus_address_get_stream_sync:
  * @address: A valid D-Bus address.
- * @out_guid: (optional) (out): %NULL or return location to store the GUID extracted from @address, if any.
+ * @out_guid: (optional) (out) (nullable): %NULL or return location to store the GUID extracted from @address, if any.
  * @cancellable: (nullable): A #GCancellable or %NULL.
  * @error: Return location for error or %NULL.
  *
@@ -940,6 +952,9 @@ g_dbus_address_get_stream_finish (GAsyncResult        *res,
  * sets up the connection so it is in a state to run the client-side
  * of the D-Bus authentication conversation. @address must be in the
  * [D-Bus address format](https://dbus.freedesktop.org/doc/dbus-specification.html#addresses).
+ *
+ * A server is not required to set a GUID, so @out_guid may be set to %NULL
+ * even on success.
  *
  * This is a synchronous failable function. See
  * g_dbus_address_get_stream() for the asynchronous version.
@@ -974,7 +989,7 @@ g_dbus_address_get_stream_sync (const gchar   *address,
       goto out;
     }
 
-  for (n = 0; addr_array != NULL && addr_array[n] != NULL; n++)
+  for (n = 0; addr_array[n] != NULL; n++)
     {
       const gchar *addr = addr_array[n];
       GError *this_error;
@@ -1271,6 +1286,7 @@ g_dbus_address_get_for_bus_sync (GBusType       bus_type,
                                  GCancellable  *cancellable,
                                  GError       **error)
 {
+  gboolean has_elevated_privileges = GLIB_PRIVATE_CALL (g_check_setuid) ();
   gchar *ret, *s = NULL;
   const gchar *starter_bus;
   GError *local_error;
@@ -1309,10 +1325,16 @@ g_dbus_address_get_for_bus_sync (GBusType       bus_type,
       _g_dbus_debug_print_unlock ();
     }
 
+  /* Don’t load the addresses from the environment if running as setuid, as they
+   * come from an unprivileged caller. */
   switch (bus_type)
     {
     case G_BUS_TYPE_SYSTEM:
-      ret = g_strdup (g_getenv ("DBUS_SYSTEM_BUS_ADDRESS"));
+      if (has_elevated_privileges)
+        ret = NULL;
+      else
+        ret = g_strdup (g_getenv ("DBUS_SYSTEM_BUS_ADDRESS"));
+
       if (ret == NULL)
         {
           ret = g_strdup ("unix:path=/var/run/dbus/system_bus_socket");
@@ -1320,7 +1342,33 @@ g_dbus_address_get_for_bus_sync (GBusType       bus_type,
       break;
 
     case G_BUS_TYPE_SESSION:
-      ret = g_strdup (g_getenv ("DBUS_SESSION_BUS_ADDRESS"));
+      if (has_elevated_privileges)
+        {
+#ifdef G_OS_UNIX
+          if (geteuid () == getuid ())
+            {
+              /* Ideally we shouldn't do this, because setgid and
+               * filesystem capabilities are also elevated privileges
+               * with which we should not be trusting environment variables
+               * from the caller. Unfortunately, there are programs with
+               * elevated privileges that rely on the session bus being
+               * available. We already prevent the really dangerous
+               * transports like autolaunch: and unixexec: when our
+               * privileges are elevated, so this can only make us connect
+               * to the wrong AF_UNIX or TCP socket. */
+              ret = g_strdup (g_getenv ("DBUS_SESSION_BUS_ADDRESS"));
+            }
+          else
+#endif
+            {
+              ret = NULL;
+            }
+        }
+      else
+        {
+          ret = g_strdup (g_getenv ("DBUS_SESSION_BUS_ADDRESS"));
+        }
+
       if (ret == NULL)
         {
           ret = get_session_address_platform_specific (&local_error);

@@ -7,6 +7,22 @@ if not use_system_pcre
   subdir('pcre')
 endif
 
+# libsysprof-capture support
+libsysprof_capture_dep = dependency('sysprof-capture-4', version: '>= 3.38.0',
+  required: get_option('sysprof'),
+  default_options: [
+    'enable_examples=false',
+    'enable_gtk=false',
+    'enable_tests=false',
+    'enable_tools=false',
+    'libsysprof=false',
+    'with_sysprofd=none',
+    'help=false',
+  ],
+  fallback: ['sysprof', 'libsysprof_capture_dep'],
+)
+glib_conf.set('HAVE_SYSPROF', libsysprof_capture_dep.found())
+
 # TODO: gnulib_objects, pcre_objects and pcre_deps are a workaround for
 # <https://github.com/mesonbuild/meson/issues/3934> and
 # <https://github.com/mesonbuild/meson/issues/3937>. When we can depend
@@ -99,7 +115,7 @@ else
     glib_conf.set('NEED_PRINTF_INFINITE_DOUBLE', 1)
   endif
 
-  if gl_cv_func_printf_long_double and gl_cv_func_printf_infinite_long_double != 'false'
+  if gl_cv_func_printf_long_double and gl_cv_func_printf_infinite_long_double
     glib_conf.set('NEED_PRINTF_INFINITE_LONG_DOUBLE', 1)
   endif
 
@@ -182,6 +198,7 @@ glib_sub_headers = files(
   'gspawn.h',
   'gstdio.h',
   'gstrfuncs.h',
+  'gstrvbuilder.h',
   'gtestutils.h',
   'gstring.h',
   'gstringchunk.h',
@@ -194,7 +211,7 @@ glib_sub_headers = files(
   'gtypes.h',
   'guuid.h',
   'gunicode.h',
-  'gurifuncs.h',
+  'guri.h',
   'gutils.h',
   'gvarianttype.h',
   'gvariant.h',
@@ -270,11 +287,14 @@ glib_sources = files(
   'gstrfuncs.c',
   'gstring.c',
   'gstringchunk.c',
+  'gstrvbuilder.c',
   'gtestutils.c',
   'gthread.c',
   'gthreadpool.c',
   'gtimer.c',
   'gtimezone.c',
+  'gtrace.c',
+  'gtrace-private.h',
   'gtranslit.c',
   'gtrashstack.c',
   'gtree.c',
@@ -283,7 +303,8 @@ glib_sources = files(
   'gunibreak.c',
   'gunicollate.c',
   'gunidecomp.c',
-  'gurifuncs.c',
+  'guri.c',
+  'guriprivate.h',
   'gutils.c',
   'gutilsprivate.h',
   'guuid.c',
@@ -316,7 +337,7 @@ else
   platform_deps = []
 endif
 
-if host_system == 'darwin'
+if glib_have_cocoa
   glib_sources += files('gosxutils.m')
 endif
 
@@ -356,21 +377,19 @@ libglib = library('glib-2.0',
   # intl.lib is not compatible with SAFESEH
   link_args : [noseh_link_args, glib_link_flags, win32_ldflags],
   include_directories : configinc,
-  dependencies : pcre_deps + [thread_dep, libintl, librt] + libiconv + platform_deps + gnulib_libm_dependency,
+  dependencies : pcre_deps + [thread_dep, librt] + libintl_deps + libiconv + platform_deps + [gnulib_libm_dependency, libm] + [libsysprof_capture_dep],
   c_args : glib_c_args,
   objc_args : glib_c_args,
 )
 
 libglib_dep = declare_dependency(
   link_with : libglib,
-  # thread_dep doesn't get pulled in from libglib atm,
-  # see https://github.com/mesonbuild/meson/issues/1426
-  dependencies : [thread_dep, libintl],
+  dependencies : libintl_deps,
   # We sadly need to export configinc here because everyone includes <glib/*.h>
   include_directories : [configinc, glibinc])
 
 pkg.generate(libglib,
-  libraries : [libintl],
+  libraries : [libintl_deps],
   libraries_private : [osx_ldflags, win32_ldflags],
   subdirs : ['glib-2.0'],
   extra_cflags : ['-I${libdir}/glib-2.0/include'] + win32_cflags,
@@ -384,6 +403,10 @@ pkg.generate(libglib,
   name : 'GLib',
   description : 'C Utility Library',
 )
+
+if meson.version().version_compare('>=0.54.0')
+  meson.override_dependency('glib-2.0', libglib_dep)
+endif
 
 # On Windows, glib needs a spawn helper for g_spawn* API
 if host_system == 'windows'

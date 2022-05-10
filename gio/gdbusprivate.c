@@ -183,6 +183,7 @@ _g_socket_read_with_control_messages (GSocket                 *socket,
 
   task = g_task_new (socket, cancellable, callback, user_data);
   g_task_set_source_tag (task, _g_socket_read_with_control_messages);
+  g_task_set_name (task, "[gio] D-Bus read");
   g_task_set_task_data (task, data, (GDestroyNotify) read_with_control_data_free);
 
   if (g_socket_condition_check (socket, G_IO_IN))
@@ -264,7 +265,7 @@ ensure_required_types (void)
 
 typedef struct
 {
-  volatile gint refcount;
+  gint refcount;  /* (atomic) */
   GThread *thread;
   GMainContext *context;
   GMainLoop *loop;
@@ -340,12 +341,12 @@ typedef enum {
 
 struct GDBusWorker
 {
-  volatile gint                       ref_count;
+  gint                                ref_count;  /* (atomic) */
 
   SharedThreadData                   *shared_thread_data;
 
   /* really a boolean, but GLib 2.28 lacks atomic boolean ops */
-  volatile gint                       stopped;
+  gint                                stopped;  /* (atomic) */
 
   /* TODO: frozen (e.g. G_DBUS_CONNECTION_FLAGS_DELAY_MESSAGE_PROCESSING) currently
    * only affects messages received from the other peer (since GDBusServer is the
@@ -1084,8 +1085,11 @@ write_message_continue_writing (MessageToWriteData *data)
   else
     {
 #ifdef G_OS_UNIX
-      if (fd_list != NULL)
+      if (data->total_written == 0 && fd_list != NULL)
         {
+          /* We were trying to write byte 0 of the message, which needs
+           * the fd list to be attached to it, but this connection doesn't
+           * support doing that. */
           g_task_return_new_error (task,
                                    G_IO_ERROR,
                                    G_IO_ERROR_FAILED,
@@ -1123,6 +1127,7 @@ write_message_async (GDBusWorker         *worker,
 {
   data->task = g_task_new (NULL, NULL, callback, user_data);
   g_task_set_source_tag (data->task, write_message_async);
+  g_task_set_name (data->task, "[gio] D-Bus write message");
   data->total_written = 0;
   write_message_continue_writing (data);
 }
@@ -1504,7 +1509,7 @@ continue_writing (GDBusWorker *worker)
         }
       else
         {
-          /* filters altered the message -> reencode */
+          /* filters altered the message -> re-encode */
           error = NULL;
           new_blob = g_dbus_message_to_blob (data->message,
                                              &new_blob_size,
@@ -1936,15 +1941,14 @@ _g_dbus_debug_print_unlock (void)
 void
 _g_dbus_initialize (void)
 {
-  static volatile gsize initialized = 0;
+  static gsize initialized = 0;
 
   if (g_once_init_enter (&initialized))
     {
-      volatile GQuark g_dbus_error_domain;
       const gchar *debug;
 
-      g_dbus_error_domain = G_DBUS_ERROR;
-      (g_dbus_error_domain); /* To avoid -Wunused-but-set-variable */
+      /* Ensure the domain is registered. */
+      g_dbus_error_quark ();
 
       debug = g_getenv ("G_DBUS_DEBUG");
       if (debug != NULL)
@@ -2466,31 +2470,63 @@ _g_dbus_get_machine_id (GError **error)
 
   return res;
 #else
-  gchar *ret;
-  GError *first_error;
-  /* TODO: use PACKAGE_LOCALSTATEDIR ? */
-  ret = NULL;
-  first_error = NULL;
-  if (!g_file_get_contents ("/var/lib/dbus/machine-id",
+  gchar *ret = NULL;
+  GError *first_error = NULL;
+  gsize i;
+  gboolean non_zero = FALSE;
+
+  /* Copy what dbus.git does: allow the /var/lib path to be configurable at
+   * build time, but hard-code the system-wide machine ID path in /etc. */
+  const gchar *var_lib_path = LOCALSTATEDIR "/lib/dbus/machine-id";
+  const gchar *etc_path = "/etc/machine-id";
+
+  if (!g_file_get_contents (var_lib_path,
                             &ret,
                             NULL,
                             &first_error) &&
-      !g_file_get_contents ("/etc/machine-id",
+      !g_file_get_contents (etc_path,
                             &ret,
                             NULL,
                             NULL))
     {
-      g_propagate_prefixed_error (error, first_error,
-                                  _("Unable to load /var/lib/dbus/machine-id or /etc/machine-id: "));
+      g_propagate_prefixed_error (error, g_steal_pointer (&first_error),
+                                  /* Translators: Both placeholders are file paths */
+                                  _("Unable to load %s or %s: "),
+                                  var_lib_path, etc_path);
+      return NULL;
     }
-  else
+
+  /* ignore the error from the first try, if any */
+  g_clear_error (&first_error);
+
+  /* Validate the machine ID. From `man 5 machine-id`:
+   * > The machine ID is a single newline-terminated, hexadecimal, 32-character,
+   * > lowercase ID. When decoded from hexadecimal, this corresponds to a
+   * > 16-byte/128-bit value. This ID may not be all zeros.
+   */
+  for (i = 0; ret[i] != '\0' && ret[i] != '\n'; i++)
     {
-      /* ignore the error from the first try, if any */
-      g_clear_error (&first_error);
-      /* TODO: validate value */
-      g_strstrip (ret);
+      /* Break early if it’s invalid. */
+      if (!g_ascii_isxdigit (ret[i]) || g_ascii_isupper (ret[i]))
+        break;
+
+      if (ret[i] != '0')
+        non_zero = TRUE;
     }
-  return ret;
+
+  if (i != 32 || ret[i] != '\n' || ret[i + 1] != '\0' || !non_zero)
+    {
+      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "Invalid machine ID in %s or %s",
+                   var_lib_path, etc_path);
+      g_free (ret);
+      return NULL;
+    }
+
+  /* Strip trailing newline. */
+  ret[32] = '\0';
+
+  return g_steal_pointer (&ret);
 #endif
 }
 

@@ -55,6 +55,12 @@
     </cmdsynopsis>
     <cmdsynopsis>
       <command>gio</command>
+      <arg choice="plain">launch</arg>
+      <arg choice="plain"><replaceable>DESKTOP-FILE</replaceable></arg>
+      <arg choice="opt" rep="repeat"><replaceable>FILE-ARG</replaceable></arg>
+    </cmdsynopsis>
+    <cmdsynopsis>
+      <command>gio</command>
       <arg choice="plain">list</arg>
       <arg choice="opt" rep="repeat"><replaceable>OPTION</replaceable></arg>
       <arg choice="opt" rep="repeat"><replaceable>LOCATION</replaceable></arg>
@@ -226,6 +232,10 @@
                 <term><option>-P</option>, <option>--no-dereference</option></term>
                 <listitem><para>Never follow symbolic links.</para></listitem>
               </varlistentry>
+              <varlistentry>
+                <term><option>--default-permissions</option></term>
+                <listitem><para>Use the default permissions of the current process for the destination file, rather than copying the permissions of the source file.</para></listitem>
+              </varlistentry>
             </variablelist>
           </refsect3>
         </listitem>
@@ -271,6 +281,19 @@
 
       <varlistentry>
         <term>
+          <command>launch</command>
+          <arg choice="plain"><replaceable>DESKTOP-FILE</replaceable></arg>
+          <arg choice="opt" rep="repeat"><replaceable>FILE-ARG</replaceable></arg>
+        </term>
+        <listitem>
+          <para>Launch a desktop file from any location given.</para>
+          <para>The <command>launch</command> command extends the behavior of the <command>open</command> command by allowing
+            any desktop file to be launched, not only those registered as file handlers.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <command>list</command>
           <arg choice="opt" rep="repeat"><replaceable>OPTION</replaceable></arg>
           <arg choice="opt" rep="repeat"><replaceable>LOCATION</replaceable></arg>
@@ -302,6 +325,10 @@
               <varlistentry>
                 <term><option>-n</option>, <option>--nofollow-symlinks</option></term>
                 <listitem><para>Don’t follow symbolic links.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-d</option>, <option>--print-display-names</option></term>
+                <listitem><para>Print display names.</para></listitem>
               </varlistentry>
               <varlistentry>
                 <term><option>-u</option>, <option>--print-uris</option></term>
@@ -421,8 +448,8 @@
                 <listitem><para>Mount as mountable.</para></listitem>
               </varlistentry>
               <varlistentry>
-                <term><option>-d</option>, <option>--device=<replaceable>DEVICE</replaceable></option></term>
-                <listitem><para>Mount volume with device file.</para></listitem>
+                <term><option>-d</option>, <option>--device=<replaceable>ID</replaceable></option></term>
+                <listitem><para>Mount volume with device file, or other identifier.</para></listitem>
               </varlistentry>
               <varlistentry>
                 <term><option>-u</option>, <option>--unmount</option></term>
@@ -431,6 +458,10 @@
               <varlistentry>
                 <term><option>-e</option>, <option>--eject</option></term>
                 <listitem><para>Eject the location.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-t</option>, <option>--stop=<replaceable>DEVICE</replaceable></option></term>
+                <listitem><para>Stop drive with device file.</para></listitem>
               </varlistentry>
               <varlistentry>
                 <term><option>-s</option>, <option>--unmount-scheme=<replaceable>SCHEME</replaceable></option></term>
@@ -490,6 +521,31 @@
             to <replaceable>DESTINATION</replaceable>. If more than one source
             is specified, the destination must be a directory.</para>
           <para>The <command>move</command> command is similar to the traditional <command>mv</command> utility.</para>
+          <refsect3>
+            <title>Options</title>
+            <variablelist>
+              <varlistentry>
+                <term><option>-T</option>, <option>--no-target-directory</option></term>
+                <listitem><para>Don’t copy into <replaceable>DESTINATION</replaceable> even if it is a directory.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-p</option>, <option>--progress</option></term>
+                <listitem><para>Show progress.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-i</option>, <option>--interactive</option></term>
+                <listitem><para>Prompt for confirmation before overwriting files.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-b</option>, <option>--backup</option></term>
+                <listitem><para>Create backups of existing destination files.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>-C</option>, <option>--no-copy-fallback</option></term>
+                <listitem><para>Don’t use copy and delete fallback.</para></listitem>
+              </varlistentry>
+            </variablelist>
+          </refsect3>
         </listitem>
       </varlistentry>
 
@@ -641,17 +697,18 @@
           <arg choice="opt" rep="repeat"><replaceable>LOCATION</replaceable></arg>
         </term>
         <listitem>
-          <para>Sends files or directories to the ‘Trashcan’. This can be a
-            different folder depending on where the file is located, and not
-            all file systems support this concept. In the common case that the
-            file lives inside a user’s home directory, the trash folder is
+          <para>Sends files or directories to the ‘Trashcan’ or restore them from
+            ‘Trashcan’. This can be a different folder depending on where the file
+            is located, and not all file systems support this concept. In the common
+            case that the file lives inside a user’s home directory, the trash folder is
             <filename><envar>$XDG_DATA_HOME</envar>/Trash</filename>.</para>
           <para>Note that moving files to the trash does not free up space on
             the file system until the ‘Trashcan’ is emptied. If you are interested
             in deleting a file irreversibly, see the <command>remove</command> command.</para>
           <para>Inspecting and emptying the ‘Trashcan’ is normally supported by
             graphical file managers such as Nautilus, but you can also see the
-            trash with the command: <command>gio list trash://</command>.</para>
+            trash with the command: <command>gio trash --list</command> or
+            <command>gio list trash://</command>.</para>
           <refsect3>
             <title>Options</title>
             <variablelist>
@@ -662,6 +719,16 @@
               <varlistentry>
                 <term><option>--empty</option></term>
                 <listitem><para>Empty the trash.</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>--list</option></term>
+                <listitem><para>List files in the trash with their original locations</para></listitem>
+              </varlistentry>
+              <varlistentry>
+                <term><option>--restore</option></term>
+                <listitem><para>Restore a file from trash to its original location. A URI beginning
+                                with <literal>trash://</literal> is expected here. If the original
+                                directory doesn't exist, it will be recreated.</para></listitem>
               </varlistentry>
             </variablelist>
           </refsect3>

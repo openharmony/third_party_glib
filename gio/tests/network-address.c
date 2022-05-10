@@ -40,10 +40,10 @@ static ParseTest uri_tests[] = {
   { "ftp://[fec0::abcd]/start", "ftp", "fec0::abcd", 8080, -1 },
   { "ftp://[fec0::abcd]:999/start", "ftp", "fec0::abcd", 999, -1 },
   { "ftp://joe%x-@ftp.gnome.org:2020/start", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
-  { "http://[fec0::abcd%em1]/start", "http", "fec0::abcd%em1", 8080, -1 },
+  { "http://[fec0::abcd%em1]/start", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
   { "http://[fec0::abcd%25em1]/start", "http", "fec0::abcd%em1", 8080, -1 },
-  { "http://[fec0::abcd%10]/start", "http", "fec0::abcd%10", 8080, -1 },
-  { "http://[fec0::abcd%25em%31]/start", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
+  { "http://[fec0::abcd%10]/start", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
+  { "http://[fec0::abcd%25em%31]/start", "http", "fec0::abcd%em1", 8080, -1 },
   { "ftp://ftp.gnome.org/start?foo=bar@baz", "ftp", "ftp.gnome.org", 8080, -1 }
 };
 
@@ -80,6 +80,7 @@ static ParseTest host_tests[] =
   { "[2001:db8::1]", NULL, "2001:db8::1", 1234, -1 },
   { "[2001:db8::1]:888", NULL, "2001:db8::1", 888, -1 },
   { "[2001:db8::1%em1]", NULL, "2001:db8::1%em1", 1234, -1 },
+  { "[2001:db8::1%25em1]", NULL, "2001:db8::1%25em1", 1234, -1 },
   { "[hostname", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
   { "[hostnam]e", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
   { "hostname:", NULL, NULL, 0, G_IO_ERROR_INVALID_ARGUMENT },
@@ -337,10 +338,9 @@ test_uri_scope_id (void)
                          SCOPE_ID_TEST_PORT);
   addr = g_network_address_parse_uri (uri, 0, &error);
   g_free (uri);
-  g_assert_no_error (error);
-
-  test_scope_id (addr);
-  g_object_unref (addr);
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT);
+  g_assert_null (addr);
+  g_clear_error (&error);
 
   uri = g_strdup_printf ("http://[%s%%25%s]:%d/foo",
                          SCOPE_ID_TEST_ADDR,
@@ -418,12 +418,149 @@ test_loopback_sync (void)
   g_object_unref (addr);
 }
 
+static void
+test_localhost_sync (void)
+{
+  GSocketConnectable *addr;  /* owned */
+  GSocketAddressEnumerator *enumerator;  /* owned */
+  GSocketAddress *a;  /* owned */
+  GError *error = NULL;
+  GResolver *original_resolver; /* owned */
+  MockResolver *mock_resolver; /* owned */
+  GList *ipv4_results = NULL; /* owned */
+
+  /* This test ensures that variations of the "localhost" hostname always resolve to a loopback address */
+
+  /* Set up a DNS resolver that returns nonsense for "localhost" */
+  original_resolver = g_resolver_get_default ();
+  mock_resolver = mock_resolver_new ();
+  g_resolver_set_default (G_RESOLVER (mock_resolver));
+  ipv4_results = g_list_append (ipv4_results, g_inet_address_new_from_string ("123.123.123.123"));
+  mock_resolver_set_ipv4_results (mock_resolver, ipv4_results);
+
+  addr = g_network_address_new ("localhost.", 616);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* IPv6 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "::1", 616);
+  g_object_unref (a);
+
+  /* IPv4 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "127.0.0.1", 616);
+  g_object_unref (a);
+
+  /* End of results. */
+  g_assert_null (g_socket_address_enumerator_next (enumerator, NULL, &error));
+  g_assert_no_error (error);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+
+  addr = g_network_address_new (".localhost", 616);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* IPv6 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "::1", 616);
+  g_object_unref (a);
+
+  /* IPv4 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "127.0.0.1", 616);
+  g_object_unref (a);
+
+  /* End of results. */
+  g_assert_null (g_socket_address_enumerator_next (enumerator, NULL, &error));
+  g_assert_no_error (error);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+
+  addr = g_network_address_new ("foo.localhost", 616);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* IPv6 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "::1", 616);
+  g_object_unref (a);
+
+  /* IPv4 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "127.0.0.1", 616);
+  g_object_unref (a);
+
+  /* End of results. */
+  g_assert_null (g_socket_address_enumerator_next (enumerator, NULL, &error));
+  g_assert_no_error (error);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+
+  addr = g_network_address_new (".localhost.", 616);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* IPv6 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "::1", 616);
+  g_object_unref (a);
+
+  /* IPv4 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "127.0.0.1", 616);
+  g_object_unref (a);
+
+  /* End of results. */
+  g_assert_null (g_socket_address_enumerator_next (enumerator, NULL, &error));
+  g_assert_no_error (error);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+
+  addr = g_network_address_new ("invalid", 616);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* IPv4 address. */
+  a = g_socket_address_enumerator_next (enumerator, NULL, &error);
+  g_assert_no_error (error);
+  assert_socket_address_matches (a, "123.123.123.123", 616);
+  g_object_unref (a);
+
+  /* End of results. */
+  g_assert_null (g_socket_address_enumerator_next (enumerator, NULL, &error));
+  g_assert_no_error (error);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+
+  g_resolver_set_default (original_resolver);
+  g_list_free_full (ipv4_results, (GDestroyNotify) g_object_unref);
+  g_object_unref (original_resolver);
+  g_object_unref (mock_resolver);
+}
+
 typedef struct {
   GList/*<owned GSocketAddress> */ *addrs;  /* owned */
   GMainLoop *loop;  /* owned */
+  GSocketAddressEnumerator *enumerator; /* unowned */
   guint delay_ms;
   gint expected_error_code;
 } AsyncData;
+
+static void got_addr (GObject *source_object, GAsyncResult *result, gpointer user_data);
+
+static int
+on_delayed_get_addr (gpointer user_data)
+{
+  AsyncData *data = user_data;
+  g_socket_address_enumerator_next_async (data->enumerator, NULL,
+                                          got_addr, user_data);
+  return G_SOURCE_REMOVE;
+}
 
 static void
 got_addr (GObject      *source_object,
@@ -459,11 +596,14 @@ got_addr (GObject      *source_object,
       g_assert (G_IS_INET_SOCKET_ADDRESS (a));
       data->addrs = g_list_prepend (data->addrs, a);
 
-      if (data->delay_ms)
-        g_usleep (data->delay_ms * 1000);
-
-      g_socket_address_enumerator_next_async (enumerator, NULL,
-                                              got_addr, user_data);
+      if (!data->delay_ms)
+        g_socket_address_enumerator_next_async (enumerator, NULL,
+                                                got_addr, user_data);
+      else
+        {
+          data->enumerator = enumerator;
+          g_timeout_add (data->delay_ms, on_delayed_get_addr, data);
+        }
     }
 }
 
@@ -519,6 +659,51 @@ test_loopback_async (void)
 
   g_object_unref (enumerator);
   g_object_unref (addr);
+}
+
+static void
+test_localhost_async (void)
+{
+  GSocketConnectable *addr;  /* owned */
+  GSocketAddressEnumerator *enumerator;  /* owned */
+  AsyncData data = { 0, };
+  GResolver *original_resolver; /* owned */
+  MockResolver *mock_resolver; /* owned */
+  GList *ipv4_results = NULL; /* owned */
+
+  /* This test ensures that variations of the "localhost" hostname always resolve to a loopback address */
+
+  /* Set up a DNS resolver that returns nonsense for "localhost" */
+  original_resolver = g_resolver_get_default ();
+  mock_resolver = mock_resolver_new ();
+  g_resolver_set_default (G_RESOLVER (mock_resolver));
+  ipv4_results = g_list_append (ipv4_results, g_inet_address_new_from_string ("123.123.123.123"));
+  mock_resolver_set_ipv4_results (mock_resolver, ipv4_results);
+
+  addr = g_network_address_new ("localhost", 610);
+  enumerator = g_socket_connectable_enumerate (addr);
+
+  /* Get all the addresses. */
+  data.addrs = NULL;
+  data.delay_ms = 1;
+  data.loop = g_main_loop_new (NULL, FALSE);
+
+  g_socket_address_enumerator_next_async (enumerator, NULL, got_addr, &data);
+  g_main_loop_run (data.loop);
+
+  /* Check results. */
+  g_assert_cmpuint (g_list_length (data.addrs), ==, 2);
+  assert_socket_address_matches (data.addrs->data, "::1", 610);
+  assert_socket_address_matches (data.addrs->next->data, "127.0.0.1", 610);
+
+  g_resolver_set_default (original_resolver);
+  g_list_free_full (data.addrs, (GDestroyNotify) g_object_unref);
+  g_list_free_full (ipv4_results, (GDestroyNotify) g_object_unref);
+  g_object_unref (original_resolver);
+  g_object_unref (mock_resolver);
+  g_object_unref (enumerator);
+  g_object_unref (addr);
+  g_main_loop_unref (data.loop);
 }
 
 static void
@@ -1039,6 +1224,8 @@ main (int argc, char *argv[])
   g_test_add_func ("/network-address/loopback/basic", test_loopback_basic);
   g_test_add_func ("/network-address/loopback/sync", test_loopback_sync);
   g_test_add_func ("/network-address/loopback/async", test_loopback_async);
+  g_test_add_func ("/network-address/localhost/async", test_localhost_async);
+  g_test_add_func ("/network-address/localhost/sync", test_localhost_sync);
   g_test_add_func ("/network-address/to-string", test_to_string);
 
   g_test_add ("/network-address/happy-eyeballs/basic", HappyEyeballsFixture, NULL,

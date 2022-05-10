@@ -4,13 +4,13 @@
 #include "config.h"
 #include "glib-enumtypes.h"
 #include <glib-object.h>
-/* enumerations from "../subprojects/glib/gobject/../glib/gunicode.h" */
+/* enumerations from "../gobject/../glib/gunicode.h" */
 GType
 g_unicode_type_get_type (void)
 {
-  static volatile gsize g_define_type_id__volatile = 0;
+  static gsize static_g_define_type_id = 0;
 
-  if (g_once_init_enter (&g_define_type_id__volatile))
+  if (g_once_init_enter (&static_g_define_type_id))
     {
       static const GEnumValue values[] = {
         { G_UNICODE_CONTROL, "G_UNICODE_CONTROL", "control" },
@@ -47,17 +47,17 @@ g_unicode_type_get_type (void)
       };
       GType g_define_type_id =
         g_enum_register_static (g_intern_static_string ("GUnicodeType"), values);
-      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+      g_once_init_leave (&static_g_define_type_id, g_define_type_id);
     }
 
-  return g_define_type_id__volatile;
+  return static_g_define_type_id;
 }
 GType
 g_unicode_break_type_get_type (void)
 {
-  static volatile gsize g_define_type_id__volatile = 0;
+  static gsize static_g_define_type_id = 0;
 
-  if (g_once_init_enter (&g_define_type_id__volatile))
+  if (g_once_init_enter (&static_g_define_type_id))
     {
       static const GEnumValue values[] = {
         { G_UNICODE_BREAK_MANDATORY, "G_UNICODE_BREAK_MANDATORY", "mandatory" },
@@ -107,17 +107,17 @@ g_unicode_break_type_get_type (void)
       };
       GType g_define_type_id =
         g_enum_register_static (g_intern_static_string ("GUnicodeBreakType"), values);
-      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+      g_once_init_leave (&static_g_define_type_id, g_define_type_id);
     }
 
-  return g_define_type_id__volatile;
+  return static_g_define_type_id;
 }
 GType
 g_unicode_script_get_type (void)
 {
-  static volatile gsize g_define_type_id__volatile = 0;
+  static gsize static_g_define_type_id = 0;
 
-  if (g_once_init_enter (&g_define_type_id__volatile))
+  if (g_once_init_enter (&static_g_define_type_id))
     {
       static const GEnumValue values[] = {
         { G_UNICODE_SCRIPT_INVALID_CODE, "G_UNICODE_SCRIPT_INVALID_CODE", "invalid-code" },
@@ -274,21 +274,25 @@ g_unicode_script_get_type (void)
         { G_UNICODE_SCRIPT_NANDINAGARI, "G_UNICODE_SCRIPT_NANDINAGARI", "nandinagari" },
         { G_UNICODE_SCRIPT_NYIAKENG_PUACHUE_HMONG, "G_UNICODE_SCRIPT_NYIAKENG_PUACHUE_HMONG", "nyiakeng-puachue-hmong" },
         { G_UNICODE_SCRIPT_WANCHO, "G_UNICODE_SCRIPT_WANCHO", "wancho" },
+        { G_UNICODE_SCRIPT_CHORASMIAN, "G_UNICODE_SCRIPT_CHORASMIAN", "chorasmian" },
+        { G_UNICODE_SCRIPT_DIVES_AKURU, "G_UNICODE_SCRIPT_DIVES_AKURU", "dives-akuru" },
+        { G_UNICODE_SCRIPT_KHITAN_SMALL_SCRIPT, "G_UNICODE_SCRIPT_KHITAN_SMALL_SCRIPT", "khitan-small-script" },
+        { G_UNICODE_SCRIPT_YEZIDI, "G_UNICODE_SCRIPT_YEZIDI", "yezidi" },
         { 0, NULL, NULL }
       };
       GType g_define_type_id =
         g_enum_register_static (g_intern_static_string ("GUnicodeScript"), values);
-      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+      g_once_init_leave (&static_g_define_type_id, g_define_type_id);
     }
 
-  return g_define_type_id__volatile;
+  return static_g_define_type_id;
 }
 GType
 g_normalize_mode_get_type (void)
 {
-  static volatile gsize g_define_type_id__volatile = 0;
+  static gsize static_g_define_type_id = 0;
 
-  if (g_once_init_enter (&g_define_type_id__volatile))
+  if (g_once_init_enter (&static_g_define_type_id))
     {
       static const GEnumValue values[] = {
         { G_NORMALIZE_DEFAULT, "G_NORMALIZE_DEFAULT", "default" },
@@ -303,10 +307,10 @@ g_normalize_mode_get_type (void)
       };
       GType g_define_type_id =
         g_enum_register_static (g_intern_static_string ("GNormalizeMode"), values);
-      g_once_init_leave (&g_define_type_id__volatile, g_define_type_id);
+      g_once_init_leave (&static_g_define_type_id, g_define_type_id);
     }
 
-  return g_define_type_id__volatile;
+  return static_g_define_type_id;
 }
 
 /* Generated data ends here */

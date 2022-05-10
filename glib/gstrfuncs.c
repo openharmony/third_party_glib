@@ -35,6 +35,7 @@
 #include <string.h>
 #include <locale.h>
 #include <errno.h>
+#include <garray.h>
 #include <ctype.h>              /* For tolower() */
 
 #ifdef HAVE_XLOCALE_H
@@ -379,6 +380,9 @@ g_strdup (const gchar *str)
  *
  * Returns: a pointer to the newly-allocated copy of the memory, or %NULL if @mem
  *  is %NULL.
+ * Deprecated: 2.68: Use g_memdup2() instead, as it accepts a #gsize argument
+ *     for @byte_size, avoiding the possibility of overflow in a #gsize → #guint
+ *     conversion
  */
 gpointer
 g_memdup (gconstpointer mem,
@@ -523,7 +527,7 @@ g_stpcpy (gchar       *dest,
 
 /**
  * g_strdup_vprintf:
- * @format: a standard printf() format string, but notice
+ * @format: (not nullable): a standard printf() format string, but notice
  *     [string precision pitfalls][string-precision]
  * @args: the list of parameters to insert into the format string
  *
@@ -531,6 +535,10 @@ g_stpcpy (gchar       *dest,
  * calculates the maximum space required and allocates memory to hold
  * the result. The returned string should be freed with g_free() when
  * no longer needed.
+ *
+ * The returned string is guaranteed to be non-NULL, unless @format
+ * contains `%lc` or `%ls` conversions, which can fail if no multibyte
+ * representation is available for the given character.
  *
  * See also g_vasprintf(), which offers the same functionality, but
  * additionally returns the length of the allocated string.
@@ -550,7 +558,7 @@ g_strdup_vprintf (const gchar *format,
 
 /**
  * g_strdup_printf:
- * @format: a standard printf() format string, but notice
+ * @format: (not nullable): a standard printf() format string, but notice
  *     [string precision pitfalls][string-precision]
  * @...: the parameters to insert into the format string
  *
@@ -558,6 +566,10 @@ g_strdup_vprintf (const gchar *format,
  * calculates the maximum space required and allocates memory to hold
  * the result. The returned string should be freed with g_free() when no
  * longer needed.
+ *
+ * The returned string is guaranteed to be non-NULL, unless @format
+ * contains `%lc` or `%ls` conversions, which can fail if no multibyte
+ * representation is available for the given character.
  *
  * Returns: a newly-allocated string holding the result
  */
@@ -1612,7 +1624,7 @@ g_ascii_strup (const gchar *str,
 gboolean
 g_str_is_ascii (const gchar *str)
 {
-  gint i;
+  gsize i;
 
   for (i = 0; str[i]; i++)
     if (str[i] & 0x80)
@@ -1792,7 +1804,7 @@ g_ascii_digit_value (gchar c)
  * g_ascii_xdigit_value:
  * @c: an ASCII character.
  *
- * Determines the numeric value of a character as a hexidecimal
+ * Determines the numeric value of a character as a hexadecimal
  * digit. Differs from g_unichar_xdigit_value() because it takes
  * a char, so there's no worry about sign extension if characters
  * are signed.
@@ -2376,10 +2388,9 @@ g_strsplit (const gchar *string,
             const gchar *delimiter,
             gint         max_tokens)
 {
-  GSList *string_list = NULL, *slist;
-  gchar **str_array, *s;
-  guint n = 0;
+  char *s;
   const gchar *remainder;
+  GPtrArray *string_list;
 
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (delimiter != NULL, NULL);
@@ -2388,6 +2399,7 @@ g_strsplit (const gchar *string,
   if (max_tokens < 1)
     max_tokens = G_MAXINT;
 
+  string_list = g_ptr_array_new ();
   remainder = string;
   s = strstr (remainder, delimiter);
   if (s)
@@ -2399,35 +2411,25 @@ g_strsplit (const gchar *string,
           gsize len;
 
           len = s - remainder;
-          string_list = g_slist_prepend (string_list,
-                                         g_strndup (remainder, len));
-          n++;
+          g_ptr_array_add (string_list, g_strndup (remainder, len));
           remainder = s + delimiter_len;
           s = strstr (remainder, delimiter);
         }
     }
   if (*string)
-    {
-      n++;
-      string_list = g_slist_prepend (string_list, g_strdup (remainder));
-    }
+    g_ptr_array_add (string_list, g_strdup (remainder));
 
-  str_array = g_new (gchar*, n + 1);
+  g_ptr_array_add (string_list, NULL);
 
-  str_array[n--] = NULL;
-  for (slist = string_list; slist; slist = slist->next)
-    str_array[n--] = slist->data;
-
-  g_slist_free (string_list);
-
-  return str_array;
+  return (char **) g_ptr_array_free (string_list, FALSE);
 }
 
 /**
  * g_strsplit_set:
  * @string: The string to be tokenized
  * @delimiters: A nul-terminated string containing bytes that are used
- *     to split the string.
+ *     to split the string (it can accept an empty string, which will result
+ *     in no string splitting).
  * @max_tokens: The maximum number of tokens to split @string into.
  *     If this is less than 1, the string is split completely
  *
@@ -2463,7 +2465,7 @@ g_strsplit_set (const gchar *string,
                 const gchar *delimiters,
                 gint         max_tokens)
 {
-  gboolean delim_table[256];
+  guint8 delim_table[256]; /* 1 = index is a separator; 0 otherwise */
   GSList *tokens, *list;
   gint n_tokens;
   const gchar *s;
@@ -2484,6 +2486,9 @@ g_strsplit_set (const gchar *string,
       return result;
     }
 
+  /* Check if each character in @string is a separator, by indexing by the
+   * character value into the @delim_table, which has value 1 stored at an index
+   * if that index is a separator. */
   memset (delim_table, FALSE, sizeof (delim_table));
   for (s = delimiters; *s != '\0'; ++s)
     delim_table[*(guchar *)s] = TRUE;
@@ -2542,7 +2547,7 @@ g_strfreev (gchar **str_array)
 {
   if (str_array)
     {
-      int i;
+      gsize i;
 
       for (i = 0; str_array[i] != NULL; i++)
         g_free (str_array[i]);
@@ -2567,7 +2572,7 @@ g_strdupv (gchar **str_array)
 {
   if (str_array)
     {
-      gint i;
+      gsize i;
       gchar **retval;
 
       i = 0;
@@ -2621,7 +2626,7 @@ g_strjoinv (const gchar  *separator,
 
   if (*str_array)
     {
-      gint i;
+      gsize i;
       gsize len;
       gsize separator_len;
 
@@ -2719,10 +2724,9 @@ g_strjoin (const gchar *separator,
 
 /**
  * g_strstr_len:
- * @haystack: a string
- * @haystack_len: the maximum length of @haystack. Note that -1 is
- *     a valid length, if @haystack is nul-terminated, meaning it will
- *     search through the whole string.
+ * @haystack: a nul-terminated string
+ * @haystack_len: the maximum length of @haystack in bytes. A length of -1
+ *     can be used to mean "search the entire string", like `strstr()`.
  * @needle: the string to search for
  *
  * Searches the string @haystack for the first occurrence
@@ -2826,7 +2830,8 @@ g_strrstr (const gchar *haystack,
 /**
  * g_strrstr_len:
  * @haystack: a nul-terminated string
- * @haystack_len: the maximum length of @haystack
+ * @haystack_len: the maximum length of @haystack in bytes. A length of -1
+ *     can be used to mean "search the entire string", like g_strrstr().
  * @needle: the nul-terminated string to search for
  *
  * Searches the string @haystack for the last occurrence

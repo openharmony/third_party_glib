@@ -39,7 +39,7 @@ test_empty_address (void)
   g_error_free (error);
 }
 
-/* Test that g_dbus_is_supported_address() returns FALSE for an unparseable
+/* Test that g_dbus_is_supported_address() returns FALSE for an unparsable
  * address. */
 static void
 test_unsupported_address (void)
@@ -146,6 +146,7 @@ test_nonce_tcp_address (void)
   assert_not_supported_address ("nonce-tcp:host=localhost,port=420000");
   assert_not_supported_address ("nonce-tcp:host=localhost,port=42x");
   assert_not_supported_address ("nonce-tcp:host=localhost,port=");
+  assert_not_supported_address ("nonce-tcp:host=localhost,port=42,noncefile=");
 }
 
 static void
@@ -220,4 +221,3 @@ main (int   argc,
 
   return g_test_run();
 }
-

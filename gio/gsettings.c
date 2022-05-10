@@ -961,6 +961,12 @@ g_settings_class_init (GSettingsClass *class)
  * Creates a new #GSettings object with the schema specified by
  * @schema_id.
  *
+ * It is an error for the schema to not exist: schemas are an
+ * essential part of a program, as they provide type information.
+ * If schemas need to be dynamically loaded (for example, from an
+ * optional runtime dependency), g_settings_schema_source_lookup()
+ * can be used to test for their existence before loading them.
+ *
  * Signals on the newly created #GSettings object will be dispatched
  * via the thread-default #GMainContext in effect at the time of the
  * call to g_settings_new().  The new #GSettings will hold a reference
@@ -2469,7 +2475,7 @@ g_settings_get_child (GSettings   *settings,
  *
  * Returns: (transfer full) (element-type utf8): a list of the keys on
  *    @settings, in no defined order
- * Deprecated: 2.46: Use g_settings_schema_list_keys instead().
+ * Deprecated: 2.46: Use g_settings_schema_list_keys() instead.
  */
 gchar **
 g_settings_list_keys (GSettings *settings)
@@ -3290,7 +3296,7 @@ g_settings_action_get_property (GObject *object, guint prop_id,
       break;
 
     case ACTION_PROP_STATE:
-      g_value_set_variant (value, g_settings_action_get_state (action));
+      g_value_take_variant (value, g_settings_action_get_state (action));
       break;
 
     default:

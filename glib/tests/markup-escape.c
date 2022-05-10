@@ -37,6 +37,9 @@ static EscapeTest escape_tests[] =
   { "N\xc2\x80N", "N&#x80;N" },
   { "N\xc2\x79N", "N\xc2\x79N" },
   { "N\xc2\x9fN", "N&#x9f;N" },
+
+  /* As per g_markup_escape_text()'s documentation, whitespace is not escaped: */
+  { "\t", "\t" },
 };
 
 static void
@@ -141,21 +144,21 @@ format_test (void)
 
 int main (int argc, char **argv)
 {
-  gint i;
+  gsize i;
   gchar *path;
 
   g_test_init (&argc, &argv, NULL);
 
   for (i = 0; i < G_N_ELEMENTS (escape_tests); i++)
     {
-      path = g_strdup_printf ("/markup/escape-text/%d", i);
+      path = g_strdup_printf ("/markup/escape-text/%" G_GSIZE_FORMAT, i);
       g_test_add_data_func (path, &escape_tests[i], escape_test);
       g_free (path);
     }
 
   for (i = 0; i < G_N_ELEMENTS (unichar_tests); i++)
     {
-      path = g_strdup_printf ("/markup/escape-unichar/%d", i);
+      path = g_strdup_printf ("/markup/escape-unichar/%" G_GSIZE_FORMAT, i);
       g_test_add_data_func (path, &unichar_tests[i], unichar_test);
       g_free (path);
     }

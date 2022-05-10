@@ -26,7 +26,9 @@
 
 /* For the #GDesktopAppInfoLookup macros; since macro deprecation is implemented
  * in the preprocessor, we need to define this before including glib.h*/
+#ifndef GLIB_DISABLE_DEPRECATION_WARNINGS
 #define GLIB_DISABLE_DEPRECATION_WARNINGS
+#endif
 
 #include <errno.h>
 #include <string.h>
@@ -160,7 +162,6 @@ static const gchar    *desktop_file_dirs_config_dir = NULL;
 static DesktopFileDir *desktop_file_dir_user_config = NULL;  /* (owned) */
 static DesktopFileDir *desktop_file_dir_user_data = NULL;  /* (owned) */
 static GMutex          desktop_file_dir_lock;
-static const gchar    *gio_launch_desktop_path = NULL;
 
 /* Monitor 'changed' signal handler {{{2 */
 static void desktop_file_dir_reset (DesktopFileDir *dir);
@@ -304,6 +305,55 @@ desktop_file_dir_app_name_is_masked (DesktopFileDir *dir,
   return FALSE;
 }
 
+/* Not much to go on from https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
+ * so validate it as a non-empty alphanumeric ASCII string with `-` and `_` allowed.
+ *
+ * Validation is important as the desktop IDs are used to construct filenames,
+ * and may be set by an unprivileged caller if running in a setuid program. */
+static gboolean
+validate_xdg_desktop (const gchar *desktop)
+{
+  gsize i;
+
+  for (i = 0; desktop[i] != '\0'; i++)
+    if (desktop[i] != '-' && desktop[i] != '_' &&
+        !g_ascii_isalnum (desktop[i]))
+      return FALSE;
+
+  if (i == 0)
+    return FALSE;
+
+  return TRUE;
+}
+
+static char **
+get_valid_current_desktops (const char *value)
+{
+  char **tmp;
+  gsize i;
+  GPtrArray *valid_desktops;
+
+  if (value == NULL)
+    value = g_getenv ("XDG_CURRENT_DESKTOP");
+  if (value == NULL)
+    value = "";
+
+  tmp = g_strsplit (value, G_SEARCHPATH_SEPARATOR_S, 0);
+  valid_desktops = g_ptr_array_new_full (g_strv_length (tmp) + 1, g_free);
+  for (i = 0; tmp[i]; i++)
+    {
+      if (validate_xdg_desktop (tmp[i]))
+        g_ptr_array_add (valid_desktops, tmp[i]);
+      else
+        g_free (tmp[i]);
+    }
+  g_ptr_array_add (valid_desktops, NULL);
+  g_free (tmp);
+  tmp = (char **) g_ptr_array_steal (valid_desktops, NULL);
+  g_ptr_array_unref (valid_desktops);
+  return tmp;
+}
+
 static const gchar * const *
 get_lowercase_current_desktops (void)
 {
@@ -311,23 +361,15 @@ get_lowercase_current_desktops (void)
 
   if (g_once_init_enter (&result))
     {
-      const gchar *envvar;
-      gchar **tmp;
+      char **tmp = get_valid_current_desktops (NULL);
+      gsize i, j;
 
-      envvar = g_getenv ("XDG_CURRENT_DESKTOP");
-
-      if (envvar)
+      for (i = 0; tmp[i]; i++)
         {
-          gint i, j;
-
-          tmp = g_strsplit (envvar, G_SEARCHPATH_SEPARATOR_S, 0);
-
-          for (i = 0; tmp[i]; i++)
-            for (j = 0; tmp[i][j]; j++)
-              tmp[i][j] = g_ascii_tolower (tmp[i][j]);
+          /* Convert to lowercase. */
+          for (j = 0; tmp[i][j]; j++)
+            tmp[i][j] = g_ascii_tolower (tmp[i][j]);
         }
-      else
-        tmp = g_new0 (gchar *, 0 + 1);
 
       g_once_init_leave (&result, tmp);
     }
@@ -342,15 +384,7 @@ get_current_desktops (const gchar *value)
 
   if (g_once_init_enter (&result))
     {
-      gchar **tmp;
-
-      if (!value)
-        value = g_getenv ("XDG_CURRENT_DESKTOP");
-
-      if (!value)
-        value = "";
-
-      tmp = g_strsplit (value, ":", 0);
+      char **tmp = get_valid_current_desktops (value);
 
       g_once_init_leave (&result, tmp);
     }
@@ -417,7 +451,7 @@ const gchar desktop_key_match_category[N_DESKTOP_KEYS] = {
 };
 
 /* Common prefix commands to ignore from Exec= lines */
-const char * const exec_key_match_blacklist[] = {
+const char * const exec_key_match_blocklist[] = {
   "bash",
   "env",
   "flatpak",
@@ -772,7 +806,7 @@ desktop_file_dir_unindexed_get_tweaks (DesktopFileDir *dir,
 static void
 expand_strv (gchar         ***strv_ptr,
              gchar          **to_add,
-             gchar * const   *blacklist)
+             gchar * const   *blocklist)
 {
   guint strv_len, add_len;
   gchar **strv;
@@ -791,10 +825,10 @@ expand_strv (gchar         ***strv_ptr,
 
   for (i = 0; to_add[i]; i++)
     {
-      /* Don't add blacklisted strings */
-      if (blacklist)
-        for (j = 0; blacklist[j]; j++)
-          if (g_str_equal (to_add[i], blacklist[j]))
+      /* Don't add blocklisted strings */
+      if (blocklist)
+        for (j = 0; blocklist[j]; j++)
+          if (g_str_equal (to_add[i], blocklist[j]))
             goto no_add;
 
       /* Don't add duplicates already in the list */
@@ -916,7 +950,7 @@ desktop_file_dir_unindexed_read_mimeapps_lists (DesktopFileDir *dir)
 
   dir->mime_tweaks = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, free_mime_tweaks);
 
-  /* We process in order of precedence, using a blacklisting approach to
+  /* We process in order of precedence, using a blocklisting approach to
    * avoid recording later instructions that conflict with ones we found
    * earlier.
    *
@@ -1108,7 +1142,7 @@ desktop_file_dir_unindexed_setup_search (DesktopFileDir *dir)
         {
           /* Index the interesting keys... */
           gchar **implements;
-          gint i;
+          gsize i;
 
           for (i = 0; i < G_N_ELEMENTS (desktop_key_match_category); i++)
             {
@@ -1135,8 +1169,8 @@ desktop_file_dir_unindexed_setup_search (DesktopFileDir *dir)
                   if ((slash = strrchr (raw, '/')))
                     value = slash + 1;
 
-                  /* Don't match on blacklisted binaries like interpreters */
-                  if (g_strv_contains (exec_key_match_blacklist, value))
+                  /* Don't match on blocklisted binaries like interpreters */
+                  if (g_strv_contains (exec_key_match_blocklist, value))
 		    value = NULL;
                 }
 
@@ -1187,7 +1221,7 @@ static gboolean
 array_contains (GPtrArray *array,
                 const gchar *str)
 {
-  gint i;
+  guint i;
 
   for (i = 0; i < array->len; i++)
     if (g_str_equal (array->pdata[i], str))
@@ -1200,7 +1234,7 @@ static void
 desktop_file_dir_unindexed_mime_lookup (DesktopFileDir *dir,
                                         const gchar    *mime_type,
                                         GPtrArray      *hits,
-                                        GPtrArray      *blacklist)
+                                        GPtrArray      *blocklist)
 {
   UnindexedMimeTweaks *tweaks;
   gint i;
@@ -1217,7 +1251,7 @@ desktop_file_dir_unindexed_mime_lookup (DesktopFileDir *dir,
           gchar *app_name = tweaks->additions[i];
 
           if (!desktop_file_dir_app_name_is_masked (dir, app_name) &&
-              !array_contains (blacklist, app_name) && !array_contains (hits, app_name))
+              !array_contains (blocklist, app_name) && !array_contains (hits, app_name))
             g_ptr_array_add (hits, app_name);
         }
     }
@@ -1229,8 +1263,8 @@ desktop_file_dir_unindexed_mime_lookup (DesktopFileDir *dir,
           gchar *app_name = tweaks->removals[i];
 
           if (!desktop_file_dir_app_name_is_masked (dir, app_name) &&
-              !array_contains (blacklist, app_name) && !array_contains (hits, app_name))
-            g_ptr_array_add (blacklist, app_name);
+              !array_contains (blocklist, app_name) && !array_contains (hits, app_name))
+            g_ptr_array_add (blocklist, app_name);
         }
     }
 }
@@ -1448,14 +1482,14 @@ desktop_file_dir_get_all (DesktopFileDir *dir,
  * @dir: a #DesktopFileDir
  * @mime_type: the mime type to look up
  * @hits: the array to store the hits
- * @blacklist: the array to store the blacklist
+ * @blocklist: the array to store the blocklist
  *
  * Does a lookup of a mimetype against one desktop file directory,
- * recording any hits and blacklisting and "Removed" associations (so
+ * recording any hits and blocklisting and "Removed" associations (so
  * later directories don't record them as hits).
  *
- * The items added to @hits are duplicated, but the ones in @blacklist
- * are weak pointers.  This facilitates simply freeing the blacklist
+ * The items added to @hits are duplicated, but the ones in @blocklist
+ * are weak pointers.  This facilitates simply freeing the blocklist
  * (which is only used for internal bookkeeping) but using the pdata of
  * @hits as the result of the operation.
  */
@@ -1463,9 +1497,9 @@ static void
 desktop_file_dir_mime_lookup (DesktopFileDir *dir,
                               const gchar    *mime_type,
                               GPtrArray      *hits,
-                              GPtrArray      *blacklist)
+                              GPtrArray      *blocklist)
 {
-  desktop_file_dir_unindexed_mime_lookup (dir, mime_type, hits, blacklist);
+  desktop_file_dir_unindexed_mime_lookup (dir, mime_type, hits, blocklist);
 }
 
 /*< internal >
@@ -1511,7 +1545,7 @@ desktop_file_dir_get_implementations (DesktopFileDir  *dir,
 static void
 desktop_file_dirs_lock (void)
 {
-  gint i;
+  guint i;
   const gchar *user_config_dir = g_get_user_config_dir ();
 
   g_mutex_lock (&desktop_file_dir_lock);
@@ -2106,7 +2140,7 @@ g_desktop_app_info_get_is_hidden (GDesktopAppInfo *info)
  * situations such as the #GDesktopAppInfo returned from
  * g_desktop_app_info_new_from_keyfile(), this function will return %NULL.
  *
- * Returns: (type filename): The full path to the file for @info,
+ * Returns: (nullable) (type filename): The full path to the file for @info,
  *     or %NULL if not known.
  * Since: 2.24
  */
@@ -2154,7 +2188,7 @@ g_desktop_app_info_get_icon (GAppInfo *appinfo)
  *
  * Gets the categories from the desktop file.
  *
- * Returns: The unparsed Categories key from the desktop file;
+ * Returns: (nullable): The unparsed Categories key from the desktop file;
  *     i.e. no attempt is made to split it by ';' or validate it.
  */
 const char *
@@ -2183,9 +2217,9 @@ g_desktop_app_info_get_keywords (GDesktopAppInfo *info)
  * g_desktop_app_info_get_generic_name:
  * @info: a #GDesktopAppInfo
  *
- * Gets the generic name from the destkop file.
+ * Gets the generic name from the desktop file.
  *
- * Returns: The value of the GenericName key
+ * Returns: (nullable): The value of the GenericName key
  */
 const char *
 g_desktop_app_info_get_generic_name (GDesktopAppInfo *info)
@@ -2567,6 +2601,10 @@ prepend_terminal_to_vector (int    *argc,
       else
         {
           if (check == NULL)
+            check = g_find_program_in_path ("tilix");
+          if (check == NULL)
+            check = g_find_program_in_path ("konsole");
+          if (check == NULL)
             check = g_find_program_in_path ("nxterm");
           if (check == NULL)
             check = g_find_program_in_path ("color-xterm");
@@ -2728,7 +2766,7 @@ g_desktop_app_info_launch_uris_with_spawn (GDesktopAppInfo            *info,
    * internally by expand_macro(), so we need to pass a copy of it instead,
    * and also use that copy to control the exit condition of the loop below.
    */
-  dup_uris = g_list_copy (uris);
+  dup_uris = uris;
   do
     {
       GPid pid;
@@ -2737,6 +2775,15 @@ g_desktop_app_info_launch_uris_with_spawn (GDesktopAppInfo            *info,
       char *sn_id = NULL;
       char **wrapped_argv;
       int i;
+      gsize j;
+      const gchar * const wrapper_argv[] =
+        {
+          "/bin/sh",
+          "-e",
+          "-u",
+          "-c", "export GIO_LAUNCHED_DESKTOP_FILE_PID=$$; exec \"$@\"",
+          "sh",  /* argv[0] for sh */
+        };
 
       old_uris = dup_uris;
       if (!expand_application_parameters (info, exec_line, &dup_uris, &argc, &argv, error))
@@ -2778,26 +2825,26 @@ g_desktop_app_info_launch_uris_with_spawn (GDesktopAppInfo            *info,
           g_list_free_full (launched_files, g_object_unref);
         }
 
-      if (g_once_init_enter (&gio_launch_desktop_path))
-        {
-          const gchar *tmp;
+      /* Wrap the @argv in a command which will set the
+       * `GIO_LAUNCHED_DESKTOP_FILE_PID` environment variable. We can’t set this
+       * in @envp along with `GIO_LAUNCHED_DESKTOP_FILE` because we need to know
+       * the PID of the new forked process. We can’t use setenv() between fork()
+       * and exec() because we’d rather use posix_spawn() for speed.
+       *
+       * `sh` should be available on all the platforms that `GDesktopAppInfo`
+       * currently supports (since they are all POSIX). If additional platforms
+       * need to be supported in future, it will probably have to be replaced
+       * with a wrapper program (grep the GLib git history for
+       * `gio-launch-desktop` for an example of this which could be
+       * resurrected). */
+      wrapped_argv = g_new (char *, argc + G_N_ELEMENTS (wrapper_argv) + 1);
 
-          /* Allow test suite to specify path to gio-launch-desktop */
-          tmp = g_getenv ("GIO_LAUNCH_DESKTOP");
-
-          /* Fall back on usual searching in $PATH */
-          if (tmp == NULL)
-            tmp = "gio-launch-desktop";
-          g_once_init_leave (&gio_launch_desktop_path, tmp);
-        }
-
-      wrapped_argv = g_new (char *, argc + 2);
-      wrapped_argv[0] = g_strdup (gio_launch_desktop_path);
-
+      for (j = 0; j < G_N_ELEMENTS (wrapper_argv); j++)
+        wrapped_argv[j] = g_strdup (wrapper_argv[j]);
       for (i = 0; i < argc; i++)
-        wrapped_argv[i + 1] = g_steal_pointer (&argv[i]);
+        wrapped_argv[i + G_N_ELEMENTS (wrapper_argv)] = g_steal_pointer (&argv[i]);
 
-      wrapped_argv[i + 1] = NULL;
+      wrapped_argv[i + G_N_ELEMENTS (wrapper_argv)] = NULL;
       g_free (argv);
       argv = NULL;
 
@@ -2857,7 +2904,6 @@ g_desktop_app_info_launch_uris_with_spawn (GDesktopAppInfo            *info,
   completed = TRUE;
 
  out:
-  g_list_free (dup_uris);
   g_strfreev (argv);
   g_strfreev (envp);
 
@@ -3624,7 +3670,9 @@ update_mimeapps_list (const char  *desktop_id,
   data = g_key_file_to_data (key_file, &data_size, error);
   g_key_file_free (key_file);
 
-  res = g_file_set_contents (filename, data, data_size, error);
+  res = g_file_set_contents_full (filename, data, data_size,
+                                  G_FILE_SET_CONTENTS_CONSISTENT | G_FILE_SET_CONTENTS_ONLY_EXISTING,
+                                  0600, error);
 
   desktop_file_dirs_invalidate_user_config ();
 
@@ -3768,7 +3816,9 @@ g_desktop_app_info_set_as_default_for_extension (GAppInfo    *appinfo,
                          " </mime-type>\n"
                          "</mime-info>\n", mimetype, extension, extension);
 
-      g_file_set_contents (filename, contents, -1, NULL);
+      g_file_set_contents_full (filename, contents, -1,
+                                G_FILE_SET_CONTENTS_CONSISTENT | G_FILE_SET_CONTENTS_ONLY_EXISTING,
+                                0600, NULL);
       g_free (contents);
 
       run_update_command ("update-mime-database", "mime");
@@ -3917,7 +3967,9 @@ g_desktop_app_info_ensure_saved (GDesktopAppInfo  *info,
   /* FIXME - actually handle error */
   (void) g_close (fd, NULL);
 
-  res = g_file_set_contents (filename, data, data_size, error);
+  res = g_file_set_contents_full (filename, data, data_size,
+                                  G_FILE_SET_CONTENTS_CONSISTENT | G_FILE_SET_CONTENTS_ONLY_EXISTING,
+                                  0600, error);
   g_free (data);
   if (!res)
     {
@@ -4095,7 +4147,7 @@ get_list_of_mimetypes (const gchar *content_type,
 
   if (include_fallback)
     {
-      gint i;
+      guint i;
 
       /* Iterate the array as we grow it, until we have nothing more to add */
       for (i = 0; i < array->len; i++)
@@ -4124,12 +4176,12 @@ static gchar **
 g_desktop_app_info_get_desktop_ids_for_content_type (const gchar *content_type,
                                                      gboolean     include_fallback)
 {
-  GPtrArray *hits, *blacklist;
+  GPtrArray *hits, *blocklist;
   gchar **types;
-  gint i, j;
+  guint i, j;
 
   hits = g_ptr_array_new ();
-  blacklist = g_ptr_array_new ();
+  blocklist = g_ptr_array_new ();
 
   types = get_list_of_mimetypes (content_type, include_fallback);
 
@@ -4137,7 +4189,7 @@ g_desktop_app_info_get_desktop_ids_for_content_type (const gchar *content_type,
 
   for (i = 0; types[i]; i++)
     for (j = 0; j < desktop_file_dirs->len; j++)
-      desktop_file_dir_mime_lookup (g_ptr_array_index (desktop_file_dirs, j), types[i], hits, blacklist);
+      desktop_file_dir_mime_lookup (g_ptr_array_index (desktop_file_dirs, j), types[i], hits, blocklist);
 
   /* We will keep the hits past unlocking, so we must dup them */
   for (i = 0; i < hits->len; i++)
@@ -4147,7 +4199,7 @@ g_desktop_app_info_get_desktop_ids_for_content_type (const gchar *content_type,
 
   g_ptr_array_add (hits, NULL);
 
-  g_ptr_array_free (blacklist, TRUE);
+  g_ptr_array_free (blocklist, TRUE);
   g_strfreev (types);
 
   return (gchar **) g_ptr_array_free (hits, FALSE);
@@ -4313,24 +4365,24 @@ g_app_info_reset_type_associations (const char *content_type)
  *
  * Gets the default #GAppInfo for a given content type.
  *
- * Returns: (transfer full): #GAppInfo for given @content_type or
+ * Returns: (transfer full) (nullable): #GAppInfo for given @content_type or
  *     %NULL on error.
  */
 GAppInfo *
 g_app_info_get_default_for_type (const char *content_type,
                                  gboolean    must_support_uris)
 {
-  GPtrArray *blacklist;
+  GPtrArray *blocklist;
   GPtrArray *results;
   GAppInfo *info;
   gchar **types;
-  gint i, j, k;
+  guint i, j, k;
 
   g_return_val_if_fail (content_type != NULL, NULL);
 
   types = get_list_of_mimetypes (content_type, TRUE);
 
-  blacklist = g_ptr_array_new ();
+  blocklist = g_ptr_array_new ();
   results = g_ptr_array_new ();
   info = NULL;
 
@@ -4344,7 +4396,7 @@ g_app_info_get_default_for_type (const char *content_type,
 
       /* Consider the associations as well... */
       for (j = 0; j < desktop_file_dirs->len; j++)
-        desktop_file_dir_mime_lookup (g_ptr_array_index (desktop_file_dirs, j), types[i], results, blacklist);
+        desktop_file_dir_mime_lookup (g_ptr_array_index (desktop_file_dirs, j), types[i], results, blocklist);
 
       /* (If any), see if one of those apps is installed... */
       for (j = 0; j < results->len; j++)
@@ -4366,7 +4418,7 @@ g_app_info_get_default_for_type (const char *content_type,
         }
 
       /* Reset the list, ready to try again with the next (parent)
-       * mimetype, but keep the blacklist in place.
+       * mimetype, but keep the blocklist in place.
        */
       g_ptr_array_set_size (results, 0);
     }
@@ -4374,7 +4426,7 @@ g_app_info_get_default_for_type (const char *content_type,
 out:
   desktop_file_dirs_unlock ();
 
-  g_ptr_array_unref (blacklist);
+  g_ptr_array_unref (blocklist);
   g_ptr_array_unref (results);
   g_strfreev (types);
 
@@ -4390,7 +4442,8 @@ out:
  * of the URI, up to but not including the ':', e.g. "http",
  * "ftp" or "sip".
  *
- * Returns: (transfer full): #GAppInfo for given @uri_scheme or %NULL on error.
+ * Returns: (transfer full) (nullable): #GAppInfo for given @uri_scheme or
+ *     %NULL on error.
  */
 GAppInfo *
 g_app_info_get_default_for_uri_scheme (const char *uri_scheme)
@@ -4428,7 +4481,7 @@ g_desktop_app_info_get_implementations (const gchar *interface)
 {
   GList *result = NULL;
   GList **ptr;
-  gint i;
+  guint i;
 
   desktop_file_dirs_lock ();
 
@@ -4471,6 +4524,13 @@ g_desktop_app_info_get_implementations (const gchar *interface)
  * The algorithm for determining matches is undefined and may change at
  * any time.
  *
+ * None of the search results are subjected to the normal validation
+ * checks performed by g_desktop_app_info_new() (for example, checking that
+ * the executable referenced by a result exists), and so it is possible for
+ * g_desktop_app_info_new() to return %NULL when passed an app ID returned by
+ * this function. It is expected that calling code will do this when
+ * subsequently creating a #GDesktopAppInfo for each result.
+ *
  * Returns: (array zero-terminated=1) (element-type GStrv) (transfer full): a
  *   list of strvs.  Free each item with g_strfreev() and free the outer
  *   list with g_free().
@@ -4484,6 +4544,7 @@ g_desktop_app_info_search (const gchar *search_string)
   gint n_categories = 0;
   gint start_of_category;
   gint i, j;
+  guint k;
 
   search_tokens = g_str_tokenize_and_fold (search_string, NULL, NULL);
 
@@ -4491,11 +4552,11 @@ g_desktop_app_info_search (const gchar *search_string)
 
   reset_total_search_results ();
 
-  for (i = 0; i < desktop_file_dirs->len; i++)
+  for (k = 0; k < desktop_file_dirs->len; k++)
     {
       for (j = 0; search_tokens[j]; j++)
         {
-          desktop_file_dir_search (g_ptr_array_index (desktop_file_dirs, i), search_tokens[j]);
+          desktop_file_dir_search (g_ptr_array_index (desktop_file_dirs, k), search_tokens[j]);
           merge_token_results (j == 0);
         }
       merge_directory_results ();
@@ -4563,7 +4624,7 @@ g_app_info_get_all (void)
   GHashTable *apps;
   GHashTableIter iter;
   gpointer value;
-  int i;
+  guint i;
   GList *infos;
 
   apps = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -4626,7 +4687,8 @@ g_desktop_app_info_lookup_default_init (GDesktopAppInfoLookupInterface *iface)
  * in a GIO module. There is no reason for applications to use it
  * directly. Applications should use g_app_info_get_default_for_uri_scheme().
  *
- * Returns: (transfer full): #GAppInfo for given @uri_scheme or %NULL on error.
+ * Returns: (transfer full) (nullable): #GAppInfo for given @uri_scheme or
+ *    %NULL on error.
  *
  * Deprecated: 2.28: The #GDesktopAppInfoLookup interface is deprecated and
  *    unused by GIO.
@@ -4656,7 +4718,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
  * WM_CLASS property of the main window of the application, if launched
  * through @info.
  *
- * Returns: (transfer none): the startup WM class, or %NULL if none is set
+ * Returns: (nullable) (transfer none): the startup WM class, or %NULL if none is set
  * in the desktop file.
  *
  * Since: 2.34
@@ -4678,7 +4740,7 @@ g_desktop_app_info_get_startup_wm_class (GDesktopAppInfo *info)
  *
  * The @key is looked up in the "Desktop Entry" group.
  *
- * Returns: a newly allocated string, or %NULL if the key
+ * Returns: (nullable): a newly allocated string, or %NULL if the key
  *     is not found
  *
  * Since: 2.36

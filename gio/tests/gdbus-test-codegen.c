@@ -23,10 +23,22 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "glib/glib-private.h"
+
 #include "gdbus-tests.h"
 
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+#include "gdbus-test-codegen-generated-min-required-2-64.h"
+#else
 #include "gdbus-test-codegen-generated.h"
+#endif
+
 #include "gdbus-test-codegen-generated-interface-info.h"
+
+#if GLIB_VERSION_MIN_REQUIRED < GLIB_VERSION_2_68
+# undef G_DBUS_METHOD_INVOCATION_HANDLED
+# define G_DBUS_METHOD_INVOCATION_HANDLED TRUE
+#endif
 
 /* ---------------------------------------------------------------------------------------------------- */
 
@@ -95,7 +107,7 @@ on_handle_hello_world (FooiGenBar             *object,
   response = g_strdup_printf ("Word! You said '%s'. I'm Skeleton, btw!", greeting);
   foo_igen_bar_complete_hello_world (object, invocation, response);
   g_free (response);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -140,7 +152,7 @@ on_handle_test_primitive_types (FooiGenBar            *object,
   g_free (s1);
   g_free (s2);
   g_free (s3);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -180,7 +192,7 @@ on_handle_test_non_primitive_types (FooiGenBar            *object,
                                                   array_of_bytestrings,
                                                   str->str);
   g_string_free (str, TRUE);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -197,7 +209,7 @@ on_handle_request_signal_emission (FooiGenBar             *object,
       foo_igen_bar_emit_test_signal (object, 43, a_strv, a_bytestring_array, a_variant); /* consumes a_variant */
       foo_igen_bar_complete_request_signal_emission (object, invocation);
     }
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -213,7 +225,7 @@ on_handle_request_multi_property_mods (FooiGenBar             *object,
   foo_igen_bar_set_y (object, foo_igen_bar_get_y (object) + 1);
   foo_igen_bar_set_i (object, foo_igen_bar_get_i (object) + 1);
   foo_igen_bar_complete_request_multi_property_mods (object, invocation);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -233,7 +245,7 @@ on_handle_property_cancellation (FooiGenBar             *object,
   g_dbus_interface_skeleton_flush (G_DBUS_INTERFACE_SKELETON (object));
   /* this makes us return the reply D-Bus method */
   foo_igen_bar_complete_property_cancellation (object, invocation);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 /* ---------------------------------------------------------------------------------------------------- */
@@ -288,7 +300,7 @@ on_handle_force_method (FooiGenBat             *object,
   g_variant_unref (ret_ay);
   g_variant_unref (ret_struct);
 
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 
@@ -377,7 +389,7 @@ on_handle_check_not_authorized (FooiGenAuthorize       *object,
                                 gpointer                user_data)
 {
   foo_igen_authorize_complete_check_not_authorized (object, invocation);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -386,7 +398,7 @@ on_handle_check_authorized (FooiGenAuthorize       *object,
                             gpointer                user_data)
 {
   foo_igen_authorize_complete_check_authorized (object, invocation);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 static gboolean
@@ -395,7 +407,7 @@ on_handle_check_not_authorized_from_object (FooiGenAuthorize       *object,
                                             gpointer                user_data)
 {
   foo_igen_authorize_complete_check_not_authorized_from_object (object, invocation);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 /* ---------------------------------------------------------------------------------------------------- */
@@ -409,7 +421,7 @@ on_handle_get_self (FooiGenMethodThreads   *object,
   s = g_strdup_printf ("%p", (void *)g_thread_self ());
   foo_igen_method_threads_complete_get_self (object, invocation, s);
   g_free (s);
-  return TRUE;
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
 }
 
 /* ---------------------------------------------------------------------------------------------------- */
@@ -878,6 +890,10 @@ check_bar_proxy (FooiGenBar *proxy,
                                                      "/a/path",
                                                      "asig",
                                                      "bytestring\xff",
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+                                                     G_DBUS_CALL_FLAGS_NONE,
+                                                     -1,
+#endif
                                                      &ret_val_byte,
                                                      &ret_val_boolean,
                                                      &ret_val_int16,
@@ -913,6 +929,10 @@ check_bar_proxy (FooiGenBar *proxy,
                                                          array_of_objpaths,
                                                          array_of_signatures,
                                                          array_of_bytestrings,
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+                                                         G_DBUS_CALL_FLAGS_NONE,
+                                                         -1,
+#endif
                                                          &ret_array_of_strings,
                                                          &ret_array_of_objpaths,
                                                          &ret_array_of_signatures,
@@ -946,7 +966,11 @@ check_bar_proxy (FooiGenBar *proxy,
    * unimplemented methods.
    */
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_bar_call_unimplemented_method_sync (proxy, G_DBUS_CALL_FLAGS_NONE, -1, NULL /* GCancellable */, &error);
+#else
   ret = foo_igen_bar_call_unimplemented_method_sync (proxy, NULL /* GCancellable */, &error);
+#endif
   g_assert_error (error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_METHOD);
   g_error_free (error);
   error = NULL;
@@ -957,7 +981,11 @@ check_bar_proxy (FooiGenBar *proxy,
                     G_CALLBACK (on_test_signal),
                     data);
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_bar_call_request_signal_emission_sync (proxy, 0, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+#else
   ret = foo_igen_bar_call_request_signal_emission_sync (proxy, 0, NULL, &error);
+#endif
   g_assert_no_error (error);
   g_assert (ret);
 
@@ -1011,7 +1039,11 @@ check_bar_proxy (FooiGenBar *proxy,
                     G_CALLBACK (on_g_properties_changed),
                     data);
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_bar_call_request_multi_property_mods_sync (proxy, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+#else
   ret = foo_igen_bar_call_request_multi_property_mods_sync (proxy, NULL, &error);
+#endif
   g_assert_no_error (error);
   g_assert (ret);
   g_main_loop_run (thread_loop);
@@ -1077,6 +1109,10 @@ check_bar_proxy (FooiGenBar *proxy,
    */
   error = NULL;
   foo_igen_bar_call_property_cancellation (proxy,
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+                                           G_DBUS_CALL_FLAGS_NONE,
+                                           -1,
+#endif
                                            NULL, /* GCancellable */
                                            (GAsyncReadyCallback) on_property_cancellation_cb,
                                            data);
@@ -1159,6 +1195,10 @@ check_bat_proxy (FooiGenBat *proxy,
                                        g_variant_new_string ("a string"),
                                        g_variant_new_bytestring ("a bytestring\xff"),
                                        g_variant_new ("(i)", 4200),
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+                                       G_DBUS_CALL_FLAGS_NONE,
+                                       -1,
+#endif
                                        &ret_i,
                                        &ret_s,
                                        &ret_ay,
@@ -1191,18 +1231,30 @@ check_authorize_proxy (FooiGenAuthorize *proxy,
   /* Check that g-authorize-method works as intended */
 
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_authorize_call_check_not_authorized_sync (proxy, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+#else
   ret = foo_igen_authorize_call_check_not_authorized_sync (proxy, NULL, &error);
+#endif
   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_PERMISSION_DENIED);
   g_error_free (error);
   g_assert (!ret);
 
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_authorize_call_check_authorized_sync (proxy, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+#else
   ret = foo_igen_authorize_call_check_authorized_sync (proxy, NULL, &error);
+#endif
   g_assert_no_error (error);
   g_assert (ret);
 
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_authorize_call_check_not_authorized_from_object_sync (proxy, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+#else
   ret = foo_igen_authorize_call_check_not_authorized_from_object_sync (proxy, NULL, &error);
+#endif
   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_PENDING);
   g_error_free (error);
   g_assert (!ret);
@@ -1219,7 +1271,11 @@ get_self_via_proxy (FooiGenMethodThreads *proxy_1)
   gpointer self;
 
   error = NULL;
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+  ret = foo_igen_method_threads_call_get_self_sync (proxy_1, G_DBUS_CALL_FLAGS_NONE, -1, &self_str, NULL, &error);
+#else
   ret = foo_igen_method_threads_call_get_self_sync (proxy_1, &self_str, NULL, &error);
+#endif
   g_assert_no_error (error);
   g_assert (ret);
 
@@ -1248,6 +1304,18 @@ static gpointer
 check_proxies_in_thread (gpointer user_data)
 {
   GMainLoop *loop = user_data;
+#ifdef _GLIB_ADDRESS_SANITIZER
+
+  /* Silence "Not available before 2.38" when using old API */
+  G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+  g_test_incomplete ("FIXME: Leaks a GWeakRef, see glib#2312");
+  G_GNUC_END_IGNORE_DEPRECATIONS
+
+  (void) check_thread_proxies;
+  (void) check_authorize_proxy;
+  (void) check_bat_proxy;
+  (void) check_bar_proxy;
+#else
   GMainContext *thread_context;
   GMainLoop *thread_loop;
   GError *error;
@@ -1316,6 +1384,7 @@ check_proxies_in_thread (gpointer user_data)
 
   g_main_loop_unref (thread_loop);
   g_main_context_unref (thread_context);
+#endif
 
   /* this breaks out of the loop in main() (below) */
   g_main_loop_quit (loop);
@@ -2385,7 +2454,7 @@ test_interface_stability (void)
  *
  * - check that a property with name "Type" is mapped into g-name "type"
  *   with C accessors get_type_ (to avoid clashing with the GType accessor)
- *   and set_type_ (for symmetri)
+ *   and set_type_ (for symmetry)
  *   (see https://bugzilla.gnome.org/show_bug.cgi?id=679473 for details)
  *
  * - (could add more tests here)
@@ -2589,6 +2658,86 @@ test_standalone_interface_info (void)
 }
 
 /* ---------------------------------------------------------------------------------------------------- */
+static gboolean
+handle_hello_fd (FooiGenFDPassing *object,
+                 GDBusMethodInvocation *invocation,
+                 GUnixFDList *fd_list,
+                 const gchar *arg_greeting)
+{
+  foo_igen_fdpassing_complete_hello_fd (object, invocation, fd_list, arg_greeting);
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
+}
+
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_64
+static gboolean
+handle_no_annotation (FooiGenFDPassing *object,
+                      GDBusMethodInvocation *invocation,
+                      GUnixFDList *fd_list,
+                      GVariant *arg_greeting,
+                      const gchar *arg_greeting_locale)
+{
+  foo_igen_fdpassing_complete_no_annotation (object, invocation, fd_list, arg_greeting, arg_greeting_locale);
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
+}
+
+static gboolean
+handle_no_annotation_nested (FooiGenFDPassing *object,
+                             GDBusMethodInvocation *invocation,
+                             GUnixFDList *fd_list,
+                             GVariant *arg_files)
+{
+  foo_igen_fdpassing_complete_no_annotation_nested (object, invocation, fd_list);
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
+}
+#else
+static gboolean
+handle_no_annotation (FooiGenFDPassing *object,
+                      GDBusMethodInvocation *invocation,
+                      GVariant *arg_greeting,
+                      const gchar *arg_greeting_locale)
+{
+  foo_igen_fdpassing_complete_no_annotation (object, invocation, arg_greeting, arg_greeting_locale);
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
+}
+
+static gboolean
+handle_no_annotation_nested (FooiGenFDPassing *object,
+                             GDBusMethodInvocation *invocation,
+                             GVariant *arg_files)
+{
+  foo_igen_fdpassing_complete_no_annotation_nested (object, invocation);
+  return G_DBUS_METHOD_INVOCATION_HANDLED;
+}
+#endif
+
+/* Test that generated code for methods includes GUnixFDList arguments
+ * unconditionally if the method is explicitly annotated as C.UnixFD, and only
+ * emits GUnixFDList arguments when there's merely an 'h' parameter if
+ * --glib-min-required=2.64 or greater.
+ */
+static void
+test_unix_fd_list (void)
+{
+  FooiGenFDPassingIface iface;
+
+  g_test_bug ("https://gitlab.gnome.org/GNOME/glib/issues/1726");
+
+  /* This method is explicitly annotated. */
+  iface.handle_hello_fd = handle_hello_fd;
+
+  /* This one is not annotated; even though it's got an in and out 'h'
+   * parameter, for backwards compatibility we cannot emit GUnixFDList
+   * arguments unless --glib-min-required >= 2.64 was used.
+   */
+  iface.handle_no_annotation = handle_no_annotation;
+
+  /* This method has an 'h' inside a complex type. */
+  iface.handle_no_annotation_nested = handle_no_annotation_nested;
+
+  (void) iface;
+}
+
+/* ---------------------------------------------------------------------------------------------------- */
 
 int
 main (int   argc,
@@ -2603,6 +2752,7 @@ main (int   argc,
   g_test_add_func ("/gdbus/codegen/autocleanups", test_autocleanups);
   g_test_add_func ("/gdbus/codegen/deprecations", test_deprecations);
   g_test_add_func ("/gdbus/codegen/standalone-interface-info", test_standalone_interface_info);
+  g_test_add_func ("/gdbus/codegen/unix-fd-list", test_unix_fd_list);
 
   return session_bus_run ();
 }
