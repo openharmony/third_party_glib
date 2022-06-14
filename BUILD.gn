@@ -39,6 +39,7 @@ config("glib_config") {
     "-DLINK_SIZE=2",
     "-DPOSIX_MALLOC_THRESHOLD=10",
     "-DPCRE_STATIC",
+    "-DOHOS_OPT_COMPAT",
     "-UBSR_ANYCRLF",
     "-UEBCDIC",
     "-DGLIB_COMPILATION",
