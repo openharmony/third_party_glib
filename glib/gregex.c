@@ -22,11 +22,8 @@
 
 #include <string.h>
 
-#ifdef USE_SYSTEM_PCRE
-#include <pcre.h>
-#else
-#include "pcre/pcre.h"
-#endif
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 #include "gtypes.h"
 #include "gregex.h"
@@ -110,87 +107,49 @@
  * library written by Philip Hazel.
  */
 
+/* signifies that flags have already been converted from pcre1 to pcre2 */
+#define G_REGEX_FLAGS_CONVERTED 0x04000000u
 /* Mask of all the possible values for GRegexCompileFlags. */
-#define G_REGEX_COMPILE_MASK (G_REGEX_CASELESS          | \
-                              G_REGEX_MULTILINE         | \
-                              G_REGEX_DOTALL            | \
-                              G_REGEX_EXTENDED          | \
-                              G_REGEX_ANCHORED          | \
-                              G_REGEX_DOLLAR_ENDONLY    | \
-                              G_REGEX_UNGREEDY          | \
-                              G_REGEX_RAW               | \
-                              G_REGEX_NO_AUTO_CAPTURE   | \
-                              G_REGEX_OPTIMIZE          | \
-                              G_REGEX_FIRSTLINE         | \
-                              G_REGEX_DUPNAMES          | \
-                              G_REGEX_NEWLINE_CR        | \
-                              G_REGEX_NEWLINE_LF        | \
-                              G_REGEX_NEWLINE_CRLF      | \
-                              G_REGEX_NEWLINE_ANYCRLF   | \
-                              G_REGEX_BSR_ANYCRLF       | \
-                              G_REGEX_JAVASCRIPT_COMPAT)
+#define G_REGEX_COMPILE_MASK (PCRE2_CASELESS |        \
+                              PCRE2_MULTILINE |       \
+                              PCRE2_DOTALL |          \
+                              PCRE2_EXTENDED |        \
+                              PCRE2_ANCHORED |        \
+                              PCRE2_DOLLAR_ENDONLY |  \
+                              PCRE2_UNGREEDY |        \
+                              PCRE2_UTF |             \
+                              PCRE2_NO_AUTO_CAPTURE | \
+                              PCRE2_FIRSTLINE |       \
+                              PCRE2_DUPNAMES |        \
+                              PCRE2_NEWLINE_CR |      \
+                              PCRE2_NEWLINE_LF |      \
+                              PCRE2_NEWLINE_CRLF |    \
+                              PCRE2_NEWLINE_ANYCRLF | \
+                              PCRE2_BSR_ANYCRLF |     \
+                              G_REGEX_FLAGS_CONVERTED)
 
 /* Mask of all GRegexCompileFlags values that are (not) passed trough to PCRE */
 #define G_REGEX_COMPILE_PCRE_MASK (G_REGEX_COMPILE_MASK & ~G_REGEX_COMPILE_NONPCRE_MASK)
-#define G_REGEX_COMPILE_NONPCRE_MASK (G_REGEX_RAW              | \
-                                      G_REGEX_OPTIMIZE)
+#define G_REGEX_COMPILE_NONPCRE_MASK (PCRE2_UTF | \
+                                      G_REGEX_FLAGS_CONVERTED)
 
 /* Mask of all the possible values for GRegexMatchFlags. */
-#define G_REGEX_MATCH_MASK (G_REGEX_MATCH_ANCHORED         | \
-                            G_REGEX_MATCH_NOTBOL           | \
-                            G_REGEX_MATCH_NOTEOL           | \
-                            G_REGEX_MATCH_NOTEMPTY         | \
-                            G_REGEX_MATCH_PARTIAL          | \
-                            G_REGEX_MATCH_NEWLINE_CR       | \
-                            G_REGEX_MATCH_NEWLINE_LF       | \
-                            G_REGEX_MATCH_NEWLINE_CRLF     | \
-                            G_REGEX_MATCH_NEWLINE_ANY      | \
-                            G_REGEX_MATCH_NEWLINE_ANYCRLF  | \
-                            G_REGEX_MATCH_BSR_ANYCRLF      | \
-                            G_REGEX_MATCH_BSR_ANY          | \
-                            G_REGEX_MATCH_PARTIAL_SOFT     | \
-                            G_REGEX_MATCH_PARTIAL_HARD     | \
-                            G_REGEX_MATCH_NOTEMPTY_ATSTART)
-
-/* we rely on these flags having the same values */
-G_STATIC_ASSERT (G_REGEX_CASELESS          == PCRE_CASELESS);
-G_STATIC_ASSERT (G_REGEX_MULTILINE         == PCRE_MULTILINE);
-G_STATIC_ASSERT (G_REGEX_DOTALL            == PCRE_DOTALL);
-G_STATIC_ASSERT (G_REGEX_EXTENDED          == PCRE_EXTENDED);
-G_STATIC_ASSERT (G_REGEX_ANCHORED          == PCRE_ANCHORED);
-G_STATIC_ASSERT (G_REGEX_DOLLAR_ENDONLY    == PCRE_DOLLAR_ENDONLY);
-G_STATIC_ASSERT (G_REGEX_UNGREEDY          == PCRE_UNGREEDY);
-G_STATIC_ASSERT (G_REGEX_NO_AUTO_CAPTURE   == PCRE_NO_AUTO_CAPTURE);
-G_STATIC_ASSERT (G_REGEX_FIRSTLINE         == PCRE_FIRSTLINE);
-G_STATIC_ASSERT (G_REGEX_DUPNAMES          == PCRE_DUPNAMES);
-G_STATIC_ASSERT (G_REGEX_NEWLINE_CR        == PCRE_NEWLINE_CR);
-G_STATIC_ASSERT (G_REGEX_NEWLINE_LF        == PCRE_NEWLINE_LF);
-G_STATIC_ASSERT (G_REGEX_NEWLINE_CRLF      == PCRE_NEWLINE_CRLF);
-G_STATIC_ASSERT (G_REGEX_NEWLINE_ANYCRLF   == PCRE_NEWLINE_ANYCRLF);
-G_STATIC_ASSERT (G_REGEX_BSR_ANYCRLF       == PCRE_BSR_ANYCRLF);
-G_STATIC_ASSERT (G_REGEX_JAVASCRIPT_COMPAT == PCRE_JAVASCRIPT_COMPAT);
-
-G_STATIC_ASSERT (G_REGEX_MATCH_ANCHORED         == PCRE_ANCHORED);
-G_STATIC_ASSERT (G_REGEX_MATCH_NOTBOL           == PCRE_NOTBOL);
-G_STATIC_ASSERT (G_REGEX_MATCH_NOTEOL           == PCRE_NOTEOL);
-G_STATIC_ASSERT (G_REGEX_MATCH_NOTEMPTY         == PCRE_NOTEMPTY);
-G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL          == PCRE_PARTIAL);
-G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_CR       == PCRE_NEWLINE_CR);
-G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_LF       == PCRE_NEWLINE_LF);
-G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_CRLF     == PCRE_NEWLINE_CRLF);
-G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_ANY      == PCRE_NEWLINE_ANY);
-G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_ANYCRLF  == PCRE_NEWLINE_ANYCRLF);
-G_STATIC_ASSERT (G_REGEX_MATCH_BSR_ANYCRLF      == PCRE_BSR_ANYCRLF);
-G_STATIC_ASSERT (G_REGEX_MATCH_BSR_ANY          == PCRE_BSR_UNICODE);
-G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_SOFT     == PCRE_PARTIAL_SOFT);
-G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_HARD     == PCRE_PARTIAL_HARD);
-G_STATIC_ASSERT (G_REGEX_MATCH_NOTEMPTY_ATSTART == PCRE_NOTEMPTY_ATSTART);
-
-/* These PCRE flags are unused or not exposed publicly in GRegexFlags, so
- * it should be ok to reuse them for different things.
- */
-G_STATIC_ASSERT (G_REGEX_OPTIMIZE          == PCRE_NO_UTF8_CHECK);
-G_STATIC_ASSERT (G_REGEX_RAW               == PCRE_UTF8);
+#define G_REGEX_MATCH_MASK (PCRE2_ANCHORED |         \
+                            PCRE2_NOTBOL |           \
+                            PCRE2_NOTEOL |           \
+                            PCRE2_NOTEMPTY |         \
+                            PCRE2_PARTIAL_SOFT |     \
+                            PCRE2_NEWLINE_CR |       \
+                            PCRE2_NEWLINE_LF |       \
+                            PCRE2_NEWLINE_CRLF |     \
+                            PCRE2_NEWLINE_ANY |      \
+                            PCRE2_NEWLINE_ANYCRLF |  \
+                            PCRE2_BSR_ANYCRLF |      \
+                            PCRE2_BSR_UNICODE |      \
+                            PCRE2_PARTIAL_SOFT |     \
+                            PCRE2_PARTIAL_HARD |     \
+                            PCRE2_NOTEMPTY_ATSTART | \
+                            G_REGEX_FLAGS_CONVERTED)
 
 /* if the string is in UTF-8 use g_utf8_ functions, else use
  * use just +/- 1. */
@@ -214,20 +173,20 @@ struct _GMatchInfo
   gint n_workspace;             /* number of workspace elements */
   const gchar *string;          /* string passed to the match function */
   gssize string_len;            /* length of string, in bytes */
+  pcre2_match_data *match_data;
 };
 
 struct _GRegex
 {
   gint ref_count;               /* the ref count for the immutable part (atomic) */
   gchar *pattern;               /* the pattern */
-  pcre *pcre_re;                /* compiled form of the pattern */
+  pcre2_code *pcre_re;          /* compiled form of the pattern */
   GRegexCompileFlags compile_opts;      /* options used at compile time on the pattern */
   GRegexMatchFlags match_opts;  /* options used at match time on the regex */
-  pcre_extra *extra;            /* data stored when G_REGEX_OPTIMIZE is used */
 };
 
 /* TRUE if ret is an error code, FALSE otherwise. */
-#define IS_PCRE_ERROR(ret) ((ret) < PCRE_ERROR_NOMATCH && (ret) != PCRE_ERROR_PARTIAL)
+#define IS_PCRE_ERROR(ret) ((ret) < PCRE2_ERROR_NOMATCH && (ret) != PCRE2_ERROR_PARTIAL)
 
 typedef struct _InterpolationData InterpolationData;
 static gboolean  interpolation_list_needs_match (GList *list);
@@ -238,70 +197,396 @@ static GList    *split_replacement              (const gchar *replacement,
                                                  GError **error);
 static void      free_interpolation_data        (InterpolationData *data);
 
+static gint
+map_to_pcre2_compile_flags (gint pcre1_flags)
+{
+  /* Maps compile flags from pcre1 to pcre2 values
+   */
+  gint pcre2_flags = G_REGEX_FLAGS_CONVERTED;
+
+  if (pcre1_flags & G_REGEX_FLAGS_CONVERTED)
+    return pcre1_flags;
+
+  if (pcre1_flags & G_REGEX_CASELESS)
+    pcre2_flags |= PCRE2_CASELESS;
+  if (pcre1_flags & G_REGEX_MULTILINE)
+    pcre2_flags |= PCRE2_MULTILINE;
+  if (pcre1_flags & G_REGEX_DOTALL)
+    pcre2_flags |= PCRE2_DOTALL;
+  if (pcre1_flags & G_REGEX_EXTENDED)
+    pcre2_flags |= PCRE2_EXTENDED;
+  if (pcre1_flags & G_REGEX_ANCHORED)
+    pcre2_flags |= PCRE2_ANCHORED;
+  if (pcre1_flags & G_REGEX_DOLLAR_ENDONLY)
+    pcre2_flags |= PCRE2_DOLLAR_ENDONLY;
+  if (pcre1_flags & G_REGEX_UNGREEDY)
+    pcre2_flags |= PCRE2_UNGREEDY;
+  if (pcre1_flags & G_REGEX_RAW)
+    pcre2_flags |= PCRE2_UTF;
+  if (pcre1_flags & G_REGEX_NO_AUTO_CAPTURE)
+    pcre2_flags |= PCRE2_NO_AUTO_CAPTURE;
+  if (pcre1_flags & G_REGEX_FIRSTLINE)
+    pcre2_flags |= PCRE2_FIRSTLINE;
+  if (pcre1_flags & G_REGEX_DUPNAMES)
+    pcre2_flags |= PCRE2_DUPNAMES;
+  if (pcre1_flags & G_REGEX_NEWLINE_CR)
+    pcre2_flags |= PCRE2_NEWLINE_CR;
+  if (pcre1_flags & G_REGEX_NEWLINE_LF)
+    pcre2_flags |= PCRE2_NEWLINE_LF;
+  if ((pcre1_flags & G_REGEX_NEWLINE_CRLF) == G_REGEX_NEWLINE_CRLF)
+    pcre2_flags |= PCRE2_NEWLINE_CRLF;
+  if ((pcre1_flags & G_REGEX_NEWLINE_ANYCRLF) == G_REGEX_NEWLINE_ANYCRLF)
+    pcre2_flags |= PCRE2_NEWLINE_ANYCRLF;
+  if (pcre1_flags & G_REGEX_BSR_ANYCRLF)
+    pcre2_flags |= PCRE2_BSR_ANYCRLF;
+
+  /* these are not available in pcre2 */
+  if (pcre1_flags & G_REGEX_OPTIMIZE)
+    pcre2_flags |= 0;
+  if (pcre1_flags & G_REGEX_JAVASCRIPT_COMPAT)
+    pcre2_flags |= 0;
+
+  return pcre2_flags;
+}
+
+static gint
+map_to_pcre2_match_flags (gint pcre1_flags)
+{
+  /* Maps match flags from pcre1 to pcre2 values
+   */
+  gint pcre2_flags = G_REGEX_FLAGS_CONVERTED;
+
+  if (pcre1_flags & G_REGEX_FLAGS_CONVERTED)
+    return pcre1_flags;
+
+  if (pcre1_flags & G_REGEX_MATCH_ANCHORED)
+    pcre2_flags |= PCRE2_ANCHORED;
+  if (pcre1_flags & G_REGEX_MATCH_NOTBOL)
+    pcre2_flags |= PCRE2_NOTBOL;
+  if (pcre1_flags & G_REGEX_MATCH_NOTEOL)
+    pcre2_flags |= PCRE2_NOTEOL;
+  if (pcre1_flags & G_REGEX_MATCH_NOTEMPTY)
+    pcre2_flags |= PCRE2_NOTEMPTY;
+  if (pcre1_flags & G_REGEX_MATCH_PARTIAL)
+    pcre2_flags |= PCRE2_PARTIAL_SOFT;
+  if (pcre1_flags & G_REGEX_MATCH_NEWLINE_CR)
+    pcre2_flags |= PCRE2_NEWLINE_CR;
+  if (pcre1_flags & G_REGEX_MATCH_NEWLINE_LF)
+    pcre2_flags |= PCRE2_NEWLINE_LF;
+  if ((pcre1_flags & G_REGEX_MATCH_NEWLINE_CRLF) == G_REGEX_MATCH_NEWLINE_CRLF)
+    pcre2_flags |= PCRE2_NEWLINE_CRLF;
+  if (pcre1_flags & G_REGEX_MATCH_NEWLINE_ANY)
+    pcre2_flags |= PCRE2_NEWLINE_ANY;
+  if ((pcre1_flags & G_REGEX_MATCH_NEWLINE_ANYCRLF) == G_REGEX_MATCH_NEWLINE_ANYCRLF)
+    pcre2_flags |= PCRE2_NEWLINE_ANYCRLF;
+  if (pcre1_flags & G_REGEX_MATCH_BSR_ANYCRLF)
+    pcre2_flags |= PCRE2_BSR_ANYCRLF;
+  if (pcre1_flags & G_REGEX_MATCH_BSR_ANY)
+    pcre2_flags |= PCRE2_BSR_UNICODE;
+  if (pcre1_flags & G_REGEX_MATCH_PARTIAL_SOFT)
+    pcre2_flags |= PCRE2_PARTIAL_SOFT;
+  if (pcre1_flags & G_REGEX_MATCH_PARTIAL_HARD)
+    pcre2_flags |= PCRE2_PARTIAL_HARD;
+  if (pcre1_flags & G_REGEX_MATCH_NOTEMPTY_ATSTART)
+    pcre2_flags |= PCRE2_NOTEMPTY_ATSTART;
+  if (pcre1_flags & G_REGEX_RAW)
+    pcre2_flags |= PCRE2_UTF;
+
+  return pcre2_flags;
+}
+
+static gint
+map_to_pcre1_compile_flags (gint pcre2_flags)
+{
+  /* Maps compile flags from pcre2 to pcre1 values
+   */
+  gint pcre1_flags = 0;
+
+  if (!(pcre2_flags & G_REGEX_FLAGS_CONVERTED))
+    return pcre2_flags;
+
+  if (pcre2_flags & PCRE2_CASELESS)
+    pcre1_flags |= G_REGEX_CASELESS;
+  if (pcre2_flags & PCRE2_MULTILINE)
+    pcre1_flags |= G_REGEX_MULTILINE;
+  if (pcre2_flags & PCRE2_DOTALL)
+    pcre1_flags |= G_REGEX_DOTALL;
+  if (pcre2_flags & PCRE2_EXTENDED)
+    pcre1_flags |= G_REGEX_EXTENDED;
+  if (pcre2_flags & PCRE2_ANCHORED)
+    pcre1_flags |= G_REGEX_ANCHORED;
+  if (pcre2_flags & PCRE2_DOLLAR_ENDONLY)
+    pcre1_flags |= G_REGEX_DOLLAR_ENDONLY;
+  if (pcre2_flags & PCRE2_UNGREEDY)
+    pcre1_flags |= G_REGEX_UNGREEDY;
+  if (pcre2_flags & PCRE2_UTF)
+    pcre1_flags |= G_REGEX_RAW;
+  if (pcre2_flags & PCRE2_NO_AUTO_CAPTURE)
+    pcre1_flags |= G_REGEX_NO_AUTO_CAPTURE;
+  if (pcre2_flags & PCRE2_FIRSTLINE)
+    pcre1_flags |= G_REGEX_FIRSTLINE;
+  if (pcre2_flags & PCRE2_DUPNAMES)
+    pcre1_flags |= G_REGEX_DUPNAMES;
+  if (pcre2_flags & PCRE2_NEWLINE_CR)
+    pcre1_flags |= G_REGEX_NEWLINE_CR;
+  if (pcre2_flags & PCRE2_NEWLINE_LF)
+    pcre1_flags |= G_REGEX_NEWLINE_LF;
+  if ((pcre2_flags & PCRE2_NEWLINE_CRLF) == PCRE2_NEWLINE_CRLF)
+    pcre1_flags |= G_REGEX_NEWLINE_CRLF;
+  if ((pcre2_flags & PCRE2_NEWLINE_ANYCRLF) == PCRE2_NEWLINE_ANYCRLF)
+    pcre1_flags |= G_REGEX_NEWLINE_ANYCRLF;
+  if (pcre2_flags & PCRE2_BSR_ANYCRLF)
+    pcre1_flags |= G_REGEX_BSR_ANYCRLF;
+
+  return pcre1_flags;
+}
+
+static gint
+map_to_pcre1_match_flags (gint pcre2_flags)
+{
+  /* Maps match flags from pcre2 to pcre1 values
+   */
+  gint pcre1_flags = 0;
+
+  if (!(pcre2_flags & G_REGEX_FLAGS_CONVERTED))
+    return pcre2_flags;
+
+  if (pcre2_flags & PCRE2_ANCHORED)
+    pcre1_flags |= G_REGEX_MATCH_ANCHORED;
+  if (pcre2_flags & PCRE2_NOTBOL)
+    pcre1_flags |= G_REGEX_MATCH_NOTBOL;
+  if (pcre2_flags & PCRE2_NOTEOL)
+    pcre1_flags |= G_REGEX_MATCH_NOTEOL;
+  if (pcre2_flags & PCRE2_NOTEMPTY)
+    pcre1_flags |= G_REGEX_MATCH_NOTEMPTY;
+  if (pcre2_flags & PCRE2_PARTIAL_SOFT)
+    pcre1_flags |= G_REGEX_MATCH_PARTIAL;
+  if (pcre2_flags & PCRE2_NEWLINE_CR)
+    pcre1_flags |= G_REGEX_MATCH_NEWLINE_CR;
+  if (pcre2_flags & PCRE2_NEWLINE_LF)
+    pcre1_flags |= G_REGEX_MATCH_NEWLINE_LF;
+  if ((pcre2_flags & PCRE2_NEWLINE_CRLF) == PCRE2_NEWLINE_CRLF)
+    pcre1_flags |= G_REGEX_MATCH_NEWLINE_CRLF;
+  if (pcre2_flags & PCRE2_NEWLINE_ANY)
+    pcre1_flags |= G_REGEX_MATCH_NEWLINE_ANY;
+  if ((pcre2_flags & PCRE2_NEWLINE_ANYCRLF) == PCRE2_NEWLINE_ANYCRLF)
+    pcre1_flags |= G_REGEX_MATCH_NEWLINE_ANYCRLF;
+  if (pcre2_flags & PCRE2_BSR_ANYCRLF)
+    pcre1_flags |= G_REGEX_MATCH_BSR_ANYCRLF;
+  if (pcre2_flags & PCRE2_BSR_UNICODE)
+    pcre1_flags |= G_REGEX_MATCH_BSR_ANY;
+  if (pcre2_flags & PCRE2_PARTIAL_SOFT)
+    pcre1_flags |= G_REGEX_MATCH_PARTIAL_SOFT;
+  if (pcre2_flags & PCRE2_PARTIAL_HARD)
+    pcre1_flags |= G_REGEX_MATCH_PARTIAL_HARD;
+  if (pcre2_flags & PCRE2_NOTEMPTY_ATSTART)
+    pcre1_flags |= G_REGEX_MATCH_NOTEMPTY_ATSTART;
+  if (pcre2_flags & PCRE2_UTF)
+    pcre1_flags |= G_REGEX_RAW;
+
+  return pcre1_flags;
+}
+
+static gint
+map_to_gregex_error (gint pcre2_error)
+{
+  /* Maps error codes from pcre2 to gregex values (which were based on pcre1)
+   */
+  switch (pcre2_error)
+    {
+    case PCRE2_ERROR_END_BACKSLASH:
+      return G_REGEX_ERROR_STRAY_BACKSLASH;
+    case PCRE2_ERROR_END_BACKSLASH_C:
+      return G_REGEX_ERROR_MISSING_CONTROL_CHAR;
+    case PCRE2_ERROR_UNKNOWN_ESCAPE:
+      return G_REGEX_ERROR_UNRECOGNIZED_ESCAPE;
+    case PCRE2_ERROR_QUANTIFIER_OUT_OF_ORDER:
+      return G_REGEX_ERROR_QUANTIFIERS_OUT_OF_ORDER;
+    case PCRE2_ERROR_QUANTIFIER_TOO_BIG:
+      return G_REGEX_ERROR_QUANTIFIER_TOO_BIG;
+    case PCRE2_ERROR_MISSING_SQUARE_BRACKET:
+      return G_REGEX_ERROR_UNTERMINATED_CHARACTER_CLASS;
+    case PCRE2_ERROR_ESCAPE_INVALID_IN_CLASS:
+      return G_REGEX_ERROR_INVALID_ESCAPE_IN_CHARACTER_CLASS;
+    case PCRE2_ERROR_CLASS_RANGE_ORDER:
+      return G_REGEX_ERROR_RANGE_OUT_OF_ORDER;
+    case PCRE2_ERROR_QUANTIFIER_INVALID:
+      return G_REGEX_ERROR_NOTHING_TO_REPEAT;
+    case PCRE2_ERROR_INTERNAL_UNEXPECTED_REPEAT:
+      return G_REGEX_ERROR_NOTHING_TO_REPEAT;
+    case PCRE2_ERROR_INVALID_AFTER_PARENS_QUERY:
+      return G_REGEX_ERROR_UNRECOGNIZED_CHARACTER;
+    case PCRE2_ERROR_POSIX_CLASS_NOT_IN_CLASS:
+      return G_REGEX_ERROR_POSIX_NAMED_CLASS_OUTSIDE_CLASS;
+    case PCRE2_ERROR_POSIX_NO_SUPPORT_COLLATING:
+      return G_REGEX_ERROR_POSIX_COLLATING_ELEMENTS_NOT_SUPPORTED;
+    case PCRE2_ERROR_MISSING_CLOSING_PARENTHESIS:
+      return G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
+    case PCRE2_ERROR_BAD_SUBPATTERN_REFERENCE:
+      return G_REGEX_ERROR_INEXISTENT_SUBPATTERN_REFERENCE;
+    case PCRE2_ERROR_MISSING_COMMENT_CLOSING:
+      return G_REGEX_ERROR_UNTERMINATED_COMMENT;
+    case PCRE2_ERROR_PATTERN_TOO_LARGE:
+      return G_REGEX_ERROR_EXPRESSION_TOO_LARGE;
+    case PCRE2_ERROR_UNMATCHED_CLOSING_PARENTHESIS:
+      return G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
+    case PCRE2_ERROR_MISSING_CONDITION_CLOSING:
+      return G_REGEX_ERROR_MALFORMED_CONDITION;
+    case PCRE2_ERROR_LOOKBEHIND_NOT_FIXED_LENGTH:
+      return G_REGEX_ERROR_VARIABLE_LENGTH_LOOKBEHIND;
+    case PCRE2_ERROR_TOO_MANY_CONDITION_BRANCHES:
+      return G_REGEX_ERROR_TOO_MANY_CONDITIONAL_BRANCHES;
+    case PCRE2_ERROR_CONDITION_ASSERTION_EXPECTED:
+      return G_REGEX_ERROR_ASSERTION_EXPECTED;
+    case PCRE2_ERROR_BAD_RELATIVE_REFERENCE:
+      return G_REGEX_ERROR_INVALID_RELATIVE_REFERENCE;
+    case PCRE2_ERROR_UNKNOWN_POSIX_CLASS:
+      return G_REGEX_ERROR_UNKNOWN_POSIX_CLASS_NAME;
+    case PCRE2_ERROR_CODE_POINT_TOO_BIG:
+      return G_REGEX_ERROR_HEX_CODE_TOO_LARGE;
+    case PCRE2_ERROR_LOOKBEHIND_INVALID_BACKSLASH_C:
+      return G_REGEX_ERROR_SINGLE_BYTE_MATCH_IN_LOOKBEHIND;
+    case PCRE2_ERROR_UNSUPPORTED_ESCAPE_SEQUENCE:
+      return G_REGEX_ERROR_UNRECOGNIZED_ESCAPE;
+    case PCRE2_ERROR_MISSING_NAME_TERMINATOR:
+      return G_REGEX_ERROR_MISSING_SUBPATTERN_NAME_TERMINATOR;
+    case PCRE2_ERROR_DUPLICATE_SUBPATTERN_NAME:
+      return G_REGEX_ERROR_DUPLICATE_SUBPATTERN_NAME;
+    case PCRE2_ERROR_MALFORMED_UNICODE_PROPERTY:
+      return G_REGEX_ERROR_MALFORMED_PROPERTY;
+    case PCRE2_ERROR_UNKNOWN_UNICODE_PROPERTY:
+      return G_REGEX_ERROR_UNKNOWN_PROPERTY;
+    case PCRE2_ERROR_SUBPATTERN_NAME_TOO_LONG:
+      return G_REGEX_ERROR_SUBPATTERN_NAME_TOO_LONG;
+    case PCRE2_ERROR_TOO_MANY_NAMED_SUBPATTERNS:
+      return G_REGEX_ERROR_TOO_MANY_SUBPATTERNS;
+    case PCRE2_ERROR_OCTAL_BYTE_TOO_BIG:
+      return G_REGEX_ERROR_INVALID_OCTAL_VALUE;
+    case PCRE2_ERROR_DEFINE_TOO_MANY_BRANCHES:
+      return G_REGEX_ERROR_TOO_MANY_BRANCHES_IN_DEFINE;
+    case PCRE2_ERROR_INTERNAL_UNKNOWN_NEWLINE:
+      return G_REGEX_ERROR_INCONSISTENT_NEWLINE_OPTIONS;
+    case PCRE2_ERROR_BACKSLASH_G_SYNTAX:
+      return G_REGEX_ERROR_MISSING_BACK_REFERENCE;
+    case PCRE2_ERROR_PARENS_QUERY_R_MISSING_CLOSING:
+      return G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
+    case PCRE2_ERROR_VERB_ARGUMENT_NOT_ALLOWED:
+      return G_REGEX_ERROR_BACKTRACKING_CONTROL_VERB_ARGUMENT_FORBIDDEN;
+    case PCRE2_ERROR_VERB_UNKNOWN:
+      return G_REGEX_ERROR_UNKNOWN_BACKTRACKING_CONTROL_VERB;
+    case PCRE2_ERROR_SUBPATTERN_NUMBER_TOO_BIG:
+      return G_REGEX_ERROR_NUMBER_TOO_BIG;
+    case PCRE2_ERROR_SUBPATTERN_NAME_EXPECTED:
+      return G_REGEX_ERROR_MISSING_SUBPATTERN_NAME;
+    case PCRE2_ERROR_SUBPATTERN_NAMES_MISMATCH:
+      return G_REGEX_ERROR_EXTRA_SUBPATTERN_NAME;
+    case PCRE2_ERROR_MARK_MISSING_ARGUMENT:
+      return G_REGEX_ERROR_BACKTRACKING_CONTROL_VERB_ARGUMENT_REQUIRED;
+    case PCRE2_ERROR_INVALID_HEXADECIMAL:
+      return G_REGEX_ERROR_HEX_CODE_TOO_LARGE;
+    case PCRE2_ERROR_BACKSLASH_C_SYNTAX:
+      return G_REGEX_ERROR_INVALID_CONTROL_CHAR;
+    case PCRE2_ERROR_BACKSLASH_K_SYNTAX:
+      return G_REGEX_ERROR_MISSING_NAME;
+    case PCRE2_ERROR_BACKSLASH_N_IN_CLASS:
+      return G_REGEX_ERROR_NOT_SUPPORTED_IN_CLASS;
+    case PCRE2_ERROR_VERB_NAME_TOO_LONG:
+      return G_REGEX_ERROR_NAME_TOO_LONG;
+    case PCRE2_ERROR_NULL_PATTERN:
+    case PCRE2_ERROR_BAD_OPTIONS:
+    case PCRE2_ERROR_PARENTHESES_NEST_TOO_DEEP:
+    case PCRE2_ERROR_HEAP_FAILED:
+    case PCRE2_ERROR_INTERNAL_CODE_OVERFLOW:
+    case PCRE2_ERROR_ZERO_RELATIVE_REFERENCE:
+    case PCRE2_ERROR_INTERNAL_STUDY_ERROR:
+    case PCRE2_ERROR_UNICODE_NOT_SUPPORTED:
+    case PCRE2_ERROR_PARENTHESES_STACK_CHECK:
+    case PCRE2_ERROR_LOOKBEHIND_TOO_COMPLICATED:
+    case PCRE2_ERROR_CALLOUT_NUMBER_TOO_BIG:
+    case PCRE2_ERROR_MISSING_CALLOUT_CLOSING:
+    case PCRE2_ERROR_ESCAPE_INVALID_IN_VERB:
+    case PCRE2_ERROR_UNRECOGNIZED_AFTER_QUERY_P:
+    case PCRE2_ERROR_INVALID_SUBPATTERN_NAME:
+    case PCRE2_ERROR_UNICODE_PROPERTIES_UNAVAILABLE:
+    case PCRE2_ERROR_CLASS_INVALID_RANGE:
+    case PCRE2_ERROR_INTERNAL_OVERRAN_WORKSPACE:
+    case PCRE2_ERROR_INTERNAL_MISSING_SUBPATTERN:
+    case PCRE2_ERROR_BACKSLASH_O_MISSING_BRACE:
+    case PCRE2_ERROR_INTERNAL_PARSED_OVERFLOW:
+    case PCRE2_ERROR_INVALID_OCTAL:
+    case PCRE2_ERROR_INTERNAL_BAD_CODE_LOOKBEHINDS:
+    case PCRE2_ERROR_CALLOUT_STRING_TOO_LONG:
+    case PCRE2_ERROR_UNICODE_DISALLOWED_CODE_POINT:
+    case PCRE2_ERROR_UTF_IS_DISABLED:
+    case PCRE2_ERROR_UCP_IS_DISABLED:
+    case PCRE2_ERROR_BACKSLASH_U_CODE_POINT_TOO_BIG:
+    case PCRE2_ERROR_MISSING_OCTAL_OR_HEX_DIGITS:
+    case PCRE2_ERROR_VERSION_CONDITION_SYNTAX:
+    case PCRE2_ERROR_INTERNAL_BAD_CODE_AUTO_POSSESS:
+    case PCRE2_ERROR_CALLOUT_NO_STRING_DELIMITER:
+    case PCRE2_ERROR_CALLOUT_BAD_STRING_DELIMITER:
+    case PCRE2_ERROR_BACKSLASH_C_CALLER_DISABLED:
+    case PCRE2_ERROR_QUERY_BARJX_NEST_TOO_DEEP:
+    case PCRE2_ERROR_BACKSLASH_C_LIBRARY_DISABLED:
+    case PCRE2_ERROR_PATTERN_TOO_COMPLICATED:
+    case PCRE2_ERROR_LOOKBEHIND_TOO_LONG:
+    case PCRE2_ERROR_PATTERN_STRING_TOO_LONG:
+    case PCRE2_ERROR_INTERNAL_BAD_CODE:
+    case PCRE2_ERROR_INTERNAL_BAD_CODE_IN_SKIP:
+    case PCRE2_ERROR_NO_SURROGATES_IN_UTF16:
+    case PCRE2_ERROR_BAD_LITERAL_OPTIONS:
+    default:
+      return G_REGEX_ERROR_COMPILE;
+    }
+}
 
 static const gchar *
 match_error (gint errcode)
 {
   switch (errcode)
     {
-    case PCRE_ERROR_NOMATCH:
+    case PCRE2_ERROR_NOMATCH:
       /* not an error */
       break;
-    case PCRE_ERROR_NULL:
+    case PCRE2_ERROR_NULL:
       /* NULL argument, this should not happen in GRegex */
       g_warning ("A NULL argument was passed to PCRE");
       break;
-    case PCRE_ERROR_BADOPTION:
+    case PCRE2_ERROR_BADOPTION:
       return "bad options";
-    case PCRE_ERROR_BADMAGIC:
+    case PCRE2_ERROR_BADMAGIC:
       return _("corrupted object");
-    case PCRE_ERROR_UNKNOWN_OPCODE:
-      return N_("internal error or corrupted object");
-    case PCRE_ERROR_NOMEMORY:
+    case PCRE2_ERROR_NOMEMORY:
       return _("out of memory");
-    case PCRE_ERROR_NOSUBSTRING:
+    case PCRE2_ERROR_NOSUBSTRING:
       /* not used by pcre_exec() */
       break;
-    case PCRE_ERROR_MATCHLIMIT:
+    case PCRE2_ERROR_MATCHLIMIT:
       return _("backtracking limit reached");
-    case PCRE_ERROR_CALLOUT:
+    case PCRE2_ERROR_CALLOUT:
       /* callouts are not implemented */
       break;
-    case PCRE_ERROR_BADUTF8:
-    case PCRE_ERROR_BADUTF8_OFFSET:
+    case PCRE2_ERROR_BADUTFOFFSET:
       /* we do not check if strings are valid */
       break;
-    case PCRE_ERROR_PARTIAL:
+    case PCRE2_ERROR_PARTIAL:
       /* not an error */
       break;
-    case PCRE_ERROR_BADPARTIAL:
-      return _("the pattern contains items not supported for partial matching");
-    case PCRE_ERROR_INTERNAL:
+    case PCRE2_ERROR_INTERNAL:
       return _("internal error");
-    case PCRE_ERROR_BADCOUNT:
-      /* negative ovecsize, this should not happen in GRegex */
-      g_warning ("A negative ovecsize was passed to PCRE");
-      break;
-    case PCRE_ERROR_DFA_UITEM:
+    case PCRE2_ERROR_DFA_UITEM:
       return _("the pattern contains items not supported for partial matching");
-    case PCRE_ERROR_DFA_UCOND:
+    case PCRE2_ERROR_DFA_UCOND:
       return _("back references as conditions are not supported for partial matching");
-    case PCRE_ERROR_DFA_UMLIMIT:
-      /* the match_field field is not used in GRegex */
-      break;
-    case PCRE_ERROR_DFA_WSSIZE:
+    case PCRE2_ERROR_DFA_WSSIZE:
       /* handled expanding the workspace */
       break;
-    case PCRE_ERROR_DFA_RECURSE:
-    case PCRE_ERROR_RECURSIONLIMIT:
+    case PCRE2_ERROR_DFA_RECURSE:
+    case PCRE2_ERROR_RECURSIONLIMIT:
       return _("recursion limit reached");
-    case PCRE_ERROR_BADNEWLINE:
-      return _("invalid combination of newline flags");
-    case PCRE_ERROR_BADOFFSET:
+    case PCRE2_ERROR_BADOFFSET:
       return _("bad offset");
-    case PCRE_ERROR_SHORTUTF8:
-      return _("short utf8");
-    case PCRE_ERROR_RECURSELOOP:
+    case PCRE2_ERROR_RECURSELOOP:
       return _("recursion loop");
     default:
       break;
@@ -321,7 +606,8 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
    * Note that there can be more PCRE errors with the same GRegexError
    * and that some PCRE errors are useless for us.
    */
-  *errcode += 100;
+
+  *errcode = map_to_gregex_error (*errcode);
 
   switch (*errcode)
     {
@@ -562,6 +848,8 @@ match_info_new (const GRegex *regex,
 {
   GMatchInfo *match_info;
 
+  match_options = map_to_pcre2_match_flags (match_options);
+
   if (string_len < 0)
     string_len = strlen (string);
 
@@ -570,7 +858,7 @@ match_info_new (const GRegex *regex,
   match_info->regex = g_regex_ref ((GRegex *)regex);
   match_info->string = string;
   match_info->string_len = string_len;
-  match_info->matches = PCRE_ERROR_NOMATCH;
+  match_info->matches = PCRE2_ERROR_NOMATCH;
   match_info->pos = start_position;
   match_info->match_opts = match_options;
 
@@ -585,8 +873,8 @@ match_info_new (const GRegex *regex,
   else
     {
       gint capture_count;
-      pcre_fullinfo (regex->pcre_re, regex->extra,
-                     PCRE_INFO_CAPTURECOUNT, &capture_count);
+      pcre2_pattern_info (regex->pcre_re, PCRE2_INFO_CAPTURECOUNT, 
+                          &capture_count);
       match_info->n_offsets = (capture_count + 1) * 3;
     }
 
@@ -594,6 +882,10 @@ match_info_new (const GRegex *regex,
   /* Set an invalid position for the previous match. */
   match_info->offsets[0] = -1;
   match_info->offsets[1] = -1;
+
+  match_info->match_data = pcre2_match_data_create_from_pattern (
+      match_info->regex->pcre_re,
+      NULL);
 
   return match_info;
 }
@@ -669,6 +961,8 @@ g_match_info_unref (GMatchInfo *match_info)
   if (g_atomic_int_dec_and_test (&match_info->ref_count))
     {
       g_regex_unref (match_info->regex);
+      if (match_info->match_data)
+        pcre2_match_data_free (match_info->match_data);
       g_free (match_info->offsets);
       g_free (match_info->workspace);
       g_free (match_info);
@@ -715,6 +1009,9 @@ g_match_info_next (GMatchInfo  *match_info,
 {
   gint prev_match_start;
   gint prev_match_end;
+  gint i;
+  gint opts;
+  PCRE2_SIZE *ovector;
 
   g_return_val_if_fail (match_info != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
@@ -727,24 +1024,37 @@ g_match_info_next (GMatchInfo  *match_info,
     {
       /* we have reached the end of the string */
       match_info->pos = -1;
-      match_info->matches = PCRE_ERROR_NOMATCH;
+      match_info->matches = PCRE2_ERROR_NOMATCH;
       return FALSE;
     }
 
-  match_info->matches = pcre_exec (match_info->regex->pcre_re,
-                                   match_info->regex->extra,
-                                   match_info->string,
-                                   match_info->string_len,
-                                   match_info->pos,
-                                   match_info->regex->match_opts | match_info->match_opts,
-                                   match_info->offsets,
-                                   match_info->n_offsets);
+  opts = map_to_pcre2_match_flags (match_info->regex->match_opts | match_info->match_opts);
+  match_info->matches = pcre2_match (match_info->regex->pcre_re,
+                                     match_info->string,
+                                     match_info->string_len,
+                                     match_info->pos,
+                                     opts & ~G_REGEX_FLAGS_CONVERTED,
+                                     match_info->match_data,
+                                     NULL);
+
   if (IS_PCRE_ERROR (match_info->matches))
     {
       g_set_error (error, G_REGEX_ERROR, G_REGEX_ERROR_MATCH,
                    _("Error while matching regular expression %s: %s"),
                    match_info->regex->pattern, match_error (match_info->matches));
       return FALSE;
+    }
+  else
+    {
+      match_info->n_offsets = pcre2_get_ovector_count (match_info->match_data) * 2;
+      ovector = pcre2_get_ovector_pointer (match_info->match_data);
+      match_info->offsets = g_realloc_n (match_info->offsets,
+                                         match_info->n_offsets,
+                                         sizeof (gint));
+      for (i = 0; i < match_info->n_offsets; i++)
+        {
+          match_info->offsets[i] = (int) ovector[i];
+        }
     }
 
   /* avoid infinite loops if the pattern is an empty string or something
@@ -755,7 +1065,7 @@ g_match_info_next (GMatchInfo  *match_info,
         {
           /* we have reached the end of the string */
           match_info->pos = -1;
-          match_info->matches = PCRE_ERROR_NOMATCH;
+          match_info->matches = PCRE2_ERROR_NOMATCH;
           return FALSE;
         }
 
@@ -831,10 +1141,10 @@ g_match_info_get_match_count (const GMatchInfo *match_info)
 {
   g_return_val_if_fail (match_info, -1);
 
-  if (match_info->matches == PCRE_ERROR_NOMATCH)
+  if (match_info->matches == PCRE2_ERROR_NOMATCH)
     /* no match */
     return 0;
-  else if (match_info->matches < PCRE_ERROR_NOMATCH)
+  else if (match_info->matches < PCRE2_ERROR_NOMATCH)
     /* error */
     return -1;
   else
@@ -889,7 +1199,7 @@ g_match_info_is_partial_match (const GMatchInfo *match_info)
 {
   g_return_val_if_fail (match_info != NULL, FALSE);
 
-  return match_info->matches == PCRE_ERROR_PARTIAL;
+  return match_info->matches == PCRE2_ERROR_PARTIAL;
 }
 
 /**
@@ -1069,17 +1379,17 @@ get_matched_substring_number (const GMatchInfo *match_info,
                               const gchar      *name)
 {
   gint entrysize;
-  gchar *first, *last;
+  PCRE2_SPTR first, last;
   guchar *entry;
 
-  if (!(match_info->regex->compile_opts & G_REGEX_DUPNAMES))
-    return pcre_get_stringnumber (match_info->regex->pcre_re, name);
+  if (!(match_info->regex->compile_opts & PCRE2_DUPNAMES))
+    return pcre2_substring_number_from_name (match_info->regex->pcre_re, name);
 
   /* This code is copied from pcre_get.c: get_first_set() */
-  entrysize = pcre_get_stringtable_entries (match_info->regex->pcre_re,
-                                            name,
-                                            &first,
-                                            &last);
+  entrysize = pcre2_substring_nametable_scan (match_info->regex->pcre_re,
+                                              name,
+                                              &first,
+                                              &last);
 
   if (entrysize <= 0)
     return entrysize;
@@ -1259,9 +1569,7 @@ g_regex_unref (GRegex *regex)
     {
       g_free (regex->pattern);
       if (regex->pcre_re != NULL)
-        pcre_free (regex->pcre_re);
-      if (regex->extra != NULL)
-        pcre_free (regex->extra);
+        pcre2_code_free (regex->pcre_re);
       g_free (regex);
     }
 }
@@ -1269,11 +1577,11 @@ g_regex_unref (GRegex *regex)
 /*
  * @match_options: (inout) (optional):
  */
-static pcre *regex_compile (const gchar         *pattern,
-                            GRegexCompileFlags   compile_options,
-                            GRegexCompileFlags  *compile_options_out,
-                            GRegexMatchFlags    *match_options,
-                            GError             **error);
+static pcre2_code *regex_compile (const gchar *pattern,
+                                  GRegexCompileFlags compile_options,
+                                  GRegexCompileFlags *compile_options_out,
+                                  GRegexMatchFlags *match_options,
+                                  GError **error);
 
 /**
  * g_regex_new:
@@ -1297,10 +1605,11 @@ g_regex_new (const gchar         *pattern,
              GError             **error)
 {
   GRegex *regex;
-  pcre *re;
-  const gchar *errmsg;
-  gboolean optimize = FALSE;
+  pcre2_code *re;
   static gsize initialised = 0;
+
+  compile_options = map_to_pcre2_compile_flags (compile_options);
+  match_options = map_to_pcre2_match_flags (match_options);
 
   g_return_val_if_fail (pattern != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -1309,17 +1618,13 @@ g_regex_new (const gchar         *pattern,
 
   if (g_once_init_enter (&initialised))
     {
-      int supports_utf8, supports_ucp;
+      int supports_utf8;
 
-      pcre_config (PCRE_CONFIG_UTF8, &supports_utf8);
+      pcre2_config (PCRE2_CONFIG_UNICODE, &supports_utf8);
       if (!supports_utf8)
         g_critical (_("PCRE library is compiled without UTF8 support"));
 
-      pcre_config (PCRE_CONFIG_UNICODE_PROPERTIES, &supports_ucp);
-      if (!supports_ucp)
-        g_critical (_("PCRE library is compiled without UTF8 properties support"));
-
-      g_once_init_leave (&initialised, supports_utf8 && supports_ucp ? 1 : 2);
+      g_once_init_leave (&initialised, supports_utf8 ? 1 : 2);
     }
 
   if (G_UNLIKELY (initialised != 1)) 
@@ -1329,14 +1634,8 @@ g_regex_new (const gchar         *pattern,
       return NULL;
     }
 
-  /* G_REGEX_OPTIMIZE has the same numeric value of PCRE_NO_UTF8_CHECK,
-   * as we do not need to wrap PCRE_NO_UTF8_CHECK. */
-  if (compile_options & G_REGEX_OPTIMIZE)
-    optimize = TRUE;
-
   re = regex_compile (pattern, compile_options, &compile_options,
                       &match_options, error);
-
   if (re == NULL)
     return NULL;
 
@@ -1347,78 +1646,56 @@ g_regex_new (const gchar         *pattern,
   regex->compile_opts = compile_options;
   regex->match_opts = match_options;
 
-  if (optimize)
-    {
-      regex->extra = pcre_study (regex->pcre_re, 0, &errmsg);
-      if (errmsg != NULL)
-        {
-          GError *tmp_error = g_error_new (G_REGEX_ERROR,
-                                           G_REGEX_ERROR_OPTIMIZE,
-                                           _("Error while optimizing "
-                                             "regular expression %s: %s"),
-                                           regex->pattern,
-                                           errmsg);
-          g_propagate_error (error, tmp_error);
-
-          g_regex_unref (regex);
-          return NULL;
-        }
-    }
-
   return regex;
 }
 
-static pcre *
-regex_compile (const gchar         *pattern,
-               GRegexCompileFlags   compile_options,
-               GRegexCompileFlags  *compile_options_out,
-               GRegexMatchFlags    *match_options,
-               GError             **error)
+static pcre2_code *
+regex_compile (const gchar *pattern,
+               GRegexCompileFlags compile_options,
+               GRegexCompileFlags *compile_options_out,
+               GRegexMatchFlags *match_options,
+               GError **error)
 {
-  pcre *re;
+  pcre2_code *re;
   const gchar *errmsg;
-  gint erroffset;
+  PCRE2_SIZE erroffset;
   gint errcode;
   GRegexCompileFlags nonpcre_compile_options;
   unsigned long int pcre_compile_options;
+
+  compile_options = map_to_pcre2_compile_flags (compile_options);
+  *match_options = map_to_pcre2_match_flags (*match_options);
 
   nonpcre_compile_options = compile_options & G_REGEX_COMPILE_NONPCRE_MASK;
 
   /* In GRegex the string are, by default, UTF-8 encoded. PCRE
    * instead uses UTF-8 only if required with PCRE_UTF8. */
-  if (compile_options & G_REGEX_RAW)
+  if (compile_options & PCRE2_UTF)
     {
       /* disable utf-8 */
-      compile_options &= ~G_REGEX_RAW;
+      compile_options &= ~PCRE2_UTF;
     }
   else
     {
       /* enable utf-8 */
-      compile_options |= PCRE_UTF8 | PCRE_NO_UTF8_CHECK;
+      compile_options |= PCRE2_UTF | PCRE2_NO_UTF_CHECK;
 
       if (match_options != NULL)
-        *match_options |= PCRE_NO_UTF8_CHECK;
+        *match_options |= PCRE2_NO_UTF_CHECK;
     }
-
   /* PCRE_NEWLINE_ANY is the default for the internal PCRE but
    * not for the system one. */
-  if (!(compile_options & G_REGEX_NEWLINE_CR) &&
-      !(compile_options & G_REGEX_NEWLINE_LF))
+  if (!(compile_options & PCRE2_NEWLINE_CR) &&
+      !(compile_options & PCRE2_NEWLINE_LF))
     {
-      compile_options |= PCRE_NEWLINE_ANY;
+      compile_options |= PCRE2_NEWLINE_ANY;
     }
 
-  compile_options |= PCRE_UCP;
-
-  /* PCRE_BSR_UNICODE is the default for the internal PCRE but
-   * possibly not for the system one.
-   */
-  if (~compile_options & G_REGEX_BSR_ANYCRLF)
-    compile_options |= PCRE_BSR_UNICODE;
+  compile_options |= PCRE2_UCP;
 
   /* compile the pattern */
-  re = pcre_compile2 (pattern, compile_options, &errcode,
-                      &errmsg, &erroffset, NULL);
+  re = pcre2_compile (pattern, PCRE2_ZERO_TERMINATED, compile_options & ~G_REGEX_FLAGS_CONVERTED,
+                      &errcode, &erroffset, NULL);
 
   /* if the compilation failed, set the error member and return
    * immediately */
@@ -1434,8 +1711,8 @@ regex_compile (const gchar         *pattern,
       erroffset = g_utf8_pointer_to_offset (pattern, &pattern[erroffset]);
 
       tmp_error = g_error_new (G_REGEX_ERROR, errcode,
-                               _("Error while compiling regular "
-                                 "expression %s at char %d: %s"),
+                               _ ("Error while compiling regular "
+                                  "expression %s at char %" G_GSIZE_FORMAT ": %s"),
                                pattern, erroffset, errmsg);
       g_propagate_error (error, tmp_error);
 
@@ -1445,21 +1722,21 @@ regex_compile (const gchar         *pattern,
   /* For options set at the beginning of the pattern, pcre puts them into
    * compile options, e.g. "(?i)foo" will make the pcre structure store
    * PCRE_CASELESS even though it wasn't explicitly given for compilation. */
-  pcre_fullinfo (re, NULL, PCRE_INFO_OPTIONS, &pcre_compile_options);
+  pcre2_pattern_info (re, PCRE2_INFO_ALLOPTIONS, &pcre_compile_options);
   compile_options = pcre_compile_options & G_REGEX_COMPILE_PCRE_MASK;
 
   /* Don't leak PCRE_NEWLINE_ANY, which is part of PCRE_NEWLINE_ANYCRLF */
-  if ((pcre_compile_options & PCRE_NEWLINE_ANYCRLF) != PCRE_NEWLINE_ANYCRLF)
-    compile_options &= ~PCRE_NEWLINE_ANY;
+  if ((pcre_compile_options & PCRE2_NEWLINE_ANYCRLF) != PCRE2_NEWLINE_ANYCRLF)
+    compile_options &= ~PCRE2_NEWLINE_ANY;
 
   compile_options |= nonpcre_compile_options;
 
-  if (!(compile_options & G_REGEX_DUPNAMES))
+  if (!(compile_options & PCRE2_DUPNAMES))
     {
       gboolean jchanged = FALSE;
-      pcre_fullinfo (re, NULL, PCRE_INFO_JCHANGED, &jchanged);
+      pcre2_pattern_info (re, PCRE2_INFO_JCHANGED, &jchanged);
       if (jchanged)
-        compile_options |= G_REGEX_DUPNAMES;
+        compile_options |= PCRE2_DUPNAMES;
     }
 
   if (compile_options_out != 0)
@@ -1504,8 +1781,7 @@ g_regex_get_max_backref (const GRegex *regex)
 {
   gint value;
 
-  pcre_fullinfo (regex->pcre_re, regex->extra,
-                 PCRE_INFO_BACKREFMAX, &value);
+  pcre2_pattern_info (regex->pcre_re, PCRE2_INFO_BACKREFMAX, &value);
 
   return value;
 }
@@ -1525,8 +1801,7 @@ g_regex_get_capture_count (const GRegex *regex)
 {
   gint value;
 
-  pcre_fullinfo (regex->pcre_re, regex->extra,
-                 PCRE_INFO_CAPTURECOUNT, &value);
+  pcre2_pattern_info (regex->pcre_re, PCRE2_INFO_CAPTURECOUNT, &value);
 
   return value;
 }
@@ -1546,8 +1821,7 @@ g_regex_get_has_cr_or_lf (const GRegex *regex)
 {
   gint value;
 
-  pcre_fullinfo (regex->pcre_re, regex->extra,
-                 PCRE_INFO_HASCRORLF, &value);
+  pcre2_pattern_info (regex->pcre_re, PCRE2_INFO_HASCRORLF, &value);
 
   return !!value;
 }
@@ -1569,8 +1843,8 @@ g_regex_get_max_lookbehind (const GRegex *regex)
 {
   gint max_lookbehind;
 
-  pcre_fullinfo (regex->pcre_re, regex->extra,
-                 PCRE_INFO_MAXLOOKBEHIND, &max_lookbehind);
+  pcre2_pattern_info (regex->pcre_re, PCRE2_INFO_MAXLOOKBEHIND,
+                      &max_lookbehind);
 
   return max_lookbehind;
 }
@@ -1594,7 +1868,7 @@ g_regex_get_compile_flags (const GRegex *regex)
 {
   g_return_val_if_fail (regex != NULL, 0);
 
-  return regex->compile_opts;
+  return map_to_pcre1_compile_flags (regex->compile_opts);
 }
 
 /**
@@ -1612,7 +1886,7 @@ g_regex_get_match_flags (const GRegex *regex)
 {
   g_return_val_if_fail (regex != NULL, 0);
 
-  return regex->match_opts & G_REGEX_MATCH_MASK;
+  return map_to_pcre1_match_flags (regex->match_opts & G_REGEX_MATCH_MASK);
 }
 
 /**
@@ -1645,6 +1919,9 @@ g_regex_match_simple (const gchar        *pattern,
 {
   GRegex *regex;
   gboolean result;
+
+  compile_options = map_to_pcre2_compile_flags (compile_options);
+  match_options = map_to_pcre2_match_flags (match_options);
 
   regex = g_regex_new (pattern, compile_options, 0, NULL);
   if (!regex)
@@ -1713,6 +1990,8 @@ g_regex_match (const GRegex      *regex,
                GRegexMatchFlags   match_options,
                GMatchInfo       **match_info)
 {
+  match_options = map_to_pcre2_match_flags (match_options);
+
   return g_regex_match_full (regex, string, -1, 0, match_options,
                              match_info, NULL);
 }
@@ -1796,6 +2075,8 @@ g_regex_match_full (const GRegex      *regex,
   GMatchInfo *info;
   gboolean match_ok;
 
+  match_options = map_to_pcre2_match_flags (match_options);
+
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
   g_return_val_if_fail (start_position >= 0, FALSE);
@@ -1846,6 +2127,8 @@ g_regex_match_all (const GRegex      *regex,
                    GRegexMatchFlags   match_options,
                    GMatchInfo       **match_info)
 {
+  match_options = map_to_pcre2_match_flags (match_options);
+
   return g_regex_match_all_full (regex, string, -1, 0, match_options,
                                  match_info, NULL);
 }
@@ -1915,9 +2198,12 @@ g_regex_match_all_full (const GRegex      *regex,
 {
   GMatchInfo *info;
   gboolean done;
-  pcre *pcre_re;
-  pcre_extra *extra;
+  pcre2_code *pcre_re;
   gboolean retval;
+  PCRE2_SIZE *ovector;
+  gint i;
+
+  match_options = map_to_pcre2_match_flags (match_options);
 
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
@@ -1933,19 +2219,14 @@ g_regex_match_all_full (const GRegex      *regex,
    * DFA matching is rather niche, and very rarely used according to
    * codesearch.debian.net, so don't bother caching the recompiled RE. */
   pcre_re = regex_compile (regex->pattern,
-                           regex->compile_opts | PCRE_NO_AUTO_POSSESS,
+                           regex->compile_opts | PCRE2_NO_AUTO_POSSESS,
                            NULL, NULL, error);
-
   if (pcre_re == NULL)
     return FALSE;
 
-  /* Not bothering to cache the optimization data either, with similar
-   * reasoning */
-  extra = NULL;
 #else
   /* For PCRE < 8.33 the precompiled regex is fine. */
   pcre_re = regex->pcre_re;
-  extra = regex->extra;
 #endif
 
   info = match_info_new (regex, string, string_len, start_position,
@@ -1955,13 +2236,24 @@ g_regex_match_all_full (const GRegex      *regex,
   while (!done)
     {
       done = TRUE;
-      info->matches = pcre_dfa_exec (pcre_re, extra,
-                                     info->string, info->string_len,
-                                     info->pos,
-                                     regex->match_opts | match_options,
-                                     info->offsets, info->n_offsets,
-                                     info->workspace, info->n_workspace);
-      if (info->matches == PCRE_ERROR_DFA_WSSIZE)
+      info->matches = pcre2_dfa_match (pcre_re,
+                                       info->string, info->string_len,
+                                       info->pos,
+                                       (match_options | PCRE2_NO_UTF_CHECK) & ~G_REGEX_FLAGS_CONVERTED,
+                                       info->match_data,
+                                       NULL,
+                                       info->workspace, info->n_workspace);
+
+      info->n_offsets = pcre2_get_ovector_count (info->match_data) * 2;
+      ovector = pcre2_get_ovector_pointer (info->match_data);
+      info->offsets = g_realloc (info->offsets,
+                                 info->n_offsets * sizeof (gint));
+      for (i = 0; i < info->n_offsets; i++)
+        {
+          info->offsets[i] = (int) ovector[i];
+        }
+
+      if (info->matches == PCRE2_ERROR_DFA_WSSIZE)
         {
           /* info->workspace is too small. */
           info->n_workspace *= 2;
@@ -1986,7 +2278,7 @@ g_regex_match_all_full (const GRegex      *regex,
     }
 
 #ifdef PCRE_NO_AUTO_POSSESS
-  pcre_free (pcre_re);
+  pcre2_code_free (pcre_re);
 #endif
 
   /* set info->pos to -1 so that a call to g_match_info_next() fails. */
@@ -2022,8 +2314,8 @@ g_regex_get_string_number (const GRegex *regex,
   g_return_val_if_fail (regex != NULL, -1);
   g_return_val_if_fail (name != NULL, -1);
 
-  num = pcre_get_stringnumber (regex->pcre_re, name);
-  if (num == PCRE_ERROR_NOSUBSTRING)
+  num = pcre2_substring_number_from_name (regex->pcre_re, name);
+  if (num == PCRE2_ERROR_NOSUBSTRING)
     num = -1;
 
   return num;
@@ -2078,6 +2370,9 @@ g_regex_split_simple (const gchar        *pattern,
   GRegex *regex;
   gchar **result;
 
+  compile_options = map_to_pcre2_compile_flags (compile_options);
+  match_options = map_to_pcre2_match_flags (match_options);
+
   regex = g_regex_new (pattern, compile_options, 0, NULL);
   if (!regex)
     return NULL;
@@ -2121,6 +2416,8 @@ g_regex_split (const GRegex     *regex,
                const gchar      *string,
                GRegexMatchFlags  match_options)
 {
+  match_options = map_to_pcre2_match_flags (match_options);
+
   return g_regex_split_full (regex, string, -1, 0,
                              match_options, 0, NULL);
 }
@@ -2184,6 +2481,8 @@ g_regex_split_full (const GRegex      *regex,
   gboolean last_match_is_empty;
   /* the returned array of char **s */
   gchar **string_list;
+
+  match_options = map_to_pcre2_match_flags (match_options);
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
@@ -2809,6 +3108,8 @@ g_regex_replace (const GRegex      *regex,
   GList *list;
   GError *tmp_error = NULL;
 
+  match_options = map_to_pcre2_match_flags (match_options);
+
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (start_position >= 0, NULL);
@@ -2878,6 +3179,8 @@ g_regex_replace_literal (const GRegex      *regex,
                          GRegexMatchFlags   match_options,
                          GError           **error)
 {
+  match_options = map_to_pcre2_match_flags (match_options);
+
   g_return_val_if_fail (replacement != NULL, NULL);
   g_return_val_if_fail ((match_options & ~G_REGEX_MATCH_MASK) == 0, NULL);
 
@@ -2965,6 +3268,8 @@ g_regex_replace_eval (const GRegex        *regex,
   gint str_pos = 0;
   gboolean done = FALSE;
   GError *tmp_error = NULL;
+
+  match_options = map_to_pcre2_match_flags (match_options);
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);

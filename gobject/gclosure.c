@@ -1278,7 +1278,11 @@ restart:
       g_value_set_boolean (gvalue, (gboolean) *int_val);
       break;
     case G_TYPE_STRING:
+#ifdef __ILP32__
+      g_value_take_string (gvalue, (gchar*) *int_val);
+#else
       g_value_take_string (gvalue, *(gchar**)value);
+#endif
       break;
     case G_TYPE_CHAR:
       g_value_set_schar (gvalue, (gint8) *int_val);
