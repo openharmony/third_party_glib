@@ -1030,7 +1030,7 @@ g_match_info_next (GMatchInfo  *match_info,
 
   opts = map_to_pcre2_match_flags (match_info->regex->match_opts | match_info->match_opts);
   match_info->matches = pcre2_match (match_info->regex->pcre_re,
-                                     match_info->string,
+                                     (PCRE2_SPTR)match_info->string,
                                      match_info->string_len,
                                      match_info->pos,
                                      opts & ~G_REGEX_FLAGS_CONVERTED,
@@ -1383,11 +1383,11 @@ get_matched_substring_number (const GMatchInfo *match_info,
   guchar *entry;
 
   if (!(match_info->regex->compile_opts & PCRE2_DUPNAMES))
-    return pcre2_substring_number_from_name (match_info->regex->pcre_re, name);
+    return pcre2_substring_number_from_name (match_info->regex->pcre_re, (PCRE2_SPTR)name);
 
   /* This code is copied from pcre_get.c: get_first_set() */
   entrysize = pcre2_substring_nametable_scan (match_info->regex->pcre_re,
-                                              name,
+                                              (PCRE2_SPTR)name,
                                               &first,
                                               &last);
 
@@ -1694,7 +1694,7 @@ regex_compile (const gchar *pattern,
   compile_options |= PCRE2_UCP;
 
   /* compile the pattern */
-  re = pcre2_compile (pattern, PCRE2_ZERO_TERMINATED, compile_options & ~G_REGEX_FLAGS_CONVERTED,
+  re = pcre2_compile ((PCRE2_SPTR)pattern, PCRE2_ZERO_TERMINATED, compile_options & ~G_REGEX_FLAGS_CONVERTED,
                       &errcode, &erroffset, NULL);
 
   /* if the compilation failed, set the error member and return
@@ -2237,7 +2237,7 @@ g_regex_match_all_full (const GRegex      *regex,
     {
       done = TRUE;
       info->matches = pcre2_dfa_match (pcre_re,
-                                       info->string, info->string_len,
+                                       (PCRE2_SPTR)info->string, info->string_len,
                                        info->pos,
                                        (match_options | PCRE2_NO_UTF_CHECK) & ~G_REGEX_FLAGS_CONVERTED,
                                        info->match_data,
@@ -2314,7 +2314,7 @@ g_regex_get_string_number (const GRegex *regex,
   g_return_val_if_fail (regex != NULL, -1);
   g_return_val_if_fail (name != NULL, -1);
 
-  num = pcre2_substring_number_from_name (regex->pcre_re, name);
+  num = pcre2_substring_number_from_name (regex->pcre_re, (PCRE2_SPTR)name);
   if (num == PCRE2_ERROR_NOSUBSTRING)
     num = -1;
 
