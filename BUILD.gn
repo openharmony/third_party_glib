@@ -18,10 +18,10 @@ config("glib_config") {
   include_dirs = [
     ".",
     "glib/libcharset",
-    "glib/pcre",
     "glib",
     "glib/deprecated",
     "//third_party/gettext/gettext-runtime/intl",
+    "//third_party/pcre2/pcre2/src",
   ]
   cflags = [
     "-DG_LOG_DOMAIN=\"GLib\"",
@@ -38,7 +38,6 @@ config("glib_config") {
     "-DMAX_DUPLENGTH=30000",
     "-DLINK_SIZE=2",
     "-DPOSIX_MALLOC_THRESHOLD=10",
-    "-DPCRE_STATIC",
     "-DOHOS_OPT_COMPAT",
     "-UBSR_ANYCRLF",
     "-UEBCDIC",
@@ -145,24 +144,6 @@ ohos_source_set("glib_source") {
     "glib/gversion.c",
     "glib/gwakeup.c",
     "glib/libcharset/localcharset.c",
-    "glib/pcre/pcre_byte_order.c",
-    "glib/pcre/pcre_chartables.c",
-    "glib/pcre/pcre_compile.c",
-    "glib/pcre/pcre_config.c",
-    "glib/pcre/pcre_dfa_exec.c",
-    "glib/pcre/pcre_exec.c",
-    "glib/pcre/pcre_fullinfo.c",
-    "glib/pcre/pcre_get.c",
-    "glib/pcre/pcre_globals.c",
-    "glib/pcre/pcre_jit_compile.c",
-    "glib/pcre/pcre_newline.c",
-    "glib/pcre/pcre_ord2utf8.c",
-    "glib/pcre/pcre_string_utils.c",
-    "glib/pcre/pcre_study.c",
-    "glib/pcre/pcre_tables.c",
-    "glib/pcre/pcre_valid_utf8.c",
-    "glib/pcre/pcre_version.c",
-    "glib/pcre/pcre_xclass.c",
   ]
 
   configs = [ ":glib_config" ]
@@ -171,6 +152,7 @@ ohos_shared_library("glib") {
   deps = [
     ":glib_source",
     "//third_party/gettext:libintl",
+    "//third_party/pcre2:libpcre2",
   ]
   part_name = "multimedia_media_standard"
   subsystem_name = "multimedia"

@@ -1509,6 +1509,40 @@ if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
   }
 endif
 
+if host_system == 'linux-gnu_ilp32'
+if g_sizet_compatibility['short']
+  glibconfig_conf.set('glib_size_type_define', 'short')
+  glibconfig_conf.set_quoted('gsize_modifier', 'h')
+  glibconfig_conf.set_quoted('gssize_modifier', 'h')
+  glibconfig_conf.set_quoted('gsize_format', 'hu')
+  glibconfig_conf.set_quoted('gssize_format', 'hi')
+  glibconfig_conf.set('glib_msize_type', 'SHRT')
+elif g_sizet_compatibility['long']
+  glibconfig_conf.set('glib_size_type_define', 'long')
+  glibconfig_conf.set_quoted('gsize_modifier', 'l')
+  glibconfig_conf.set_quoted('gssize_modifier', 'l')
+  glibconfig_conf.set_quoted('gsize_format', 'lu')
+  glibconfig_conf.set_quoted('gssize_format', 'li')
+  glibconfig_conf.set('glib_msize_type', 'LONG')
+elif g_sizet_compatibility['int']
+  glibconfig_conf.set('glib_size_type_define', 'int')
+  glibconfig_conf.set_quoted('gsize_modifier', '')
+  glibconfig_conf.set_quoted('gssize_modifier', '')
+  glibconfig_conf.set_quoted('gsize_format', 'u')
+  glibconfig_conf.set_quoted('gssize_format', 'i')
+  glibconfig_conf.set('glib_msize_type', 'INT')
+elif g_sizet_compatibility['long long']
+  glibconfig_conf.set('glib_size_type_define', 'long long')
+  glibconfig_conf.set_quoted('gsize_modifier', int64_m)
+  glibconfig_conf.set_quoted('gssize_modifier', int64_m)
+  glibconfig_conf.set_quoted('gsize_format', int64_m + 'u')
+  glibconfig_conf.set_quoted('gssize_format', int64_m + 'i')
+  glibconfig_conf.set('glib_msize_type', 'INT64')
+else
+  error('Could not determine size of size_t.')
+endif
+
+else
 if g_sizet_compatibility['short']
   glibconfig_conf.set('glib_size_type_define', 'short')
   glibconfig_conf.set_quoted('gsize_modifier', 'h')
@@ -1539,6 +1573,7 @@ elif g_sizet_compatibility['long long']
   glibconfig_conf.set('glib_msize_type', 'INT64')
 else
   error('Could not determine size of size_t.')
+endif
 endif
 
 if voidp_size == int_size
@@ -1969,43 +2004,10 @@ if get_option('internal_pcre')
   pcre = []
   use_system_pcre = false
 else
-  pcre = dependency('libpcre', version: '>= 8.31', required : false) # Should check for Unicode support, too. FIXME
-  if not pcre.found()
-    if cc.get_id() == 'msvc' or cc.get_id() == 'clang-cl'
-    # MSVC: Search for the PCRE library by the configuration, which corresponds
-    # to the output of CMake builds of PCRE.  Note that debugoptimized
-    # is really a Release build with .PDB files.
-      if vs_crt == 'debug'
-        pcre = cc.find_library('pcred', required : false)
-      else
-        pcre = cc.find_library('pcre', required : false)
-      endif
-    endif
-  endif
-  use_system_pcre = pcre.found()
+  use_system_pcre = true
+  pcre2 = dependency('libpcre2-8', version: '>= 10.32', required : true)
 endif
 glib_conf.set('USE_SYSTEM_PCRE', use_system_pcre)
-
-use_pcre_static_flag = false
-
-if host_system == 'windows'
-  if not use_system_pcre
-    use_pcre_static_flag = true
-  else
-    pcre_static = cc.links('''#define PCRE_STATIC
-                              #include <pcre.h>
-                              int main() {
-                                void *p = NULL;
-                                pcre_free(p);
-                                return 0;
-                              }''',
-                           dependencies: pcre,
-                           name : 'Windows system PCRE is a static build')
-    if pcre_static
-      use_pcre_static_flag = true
-    endif
-  endif
-endif
 
 libm = cc.find_library('m', required : false)
 libffi_dep = dependency('libffi', version : '>= 3.0.0', fallback : ['libffi', 'ffi_dep'])
