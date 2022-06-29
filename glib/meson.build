@@ -351,21 +351,15 @@ else
   glib_dtrace_hdr = []
 endif
 
-pcre_static_args = []
-
-if use_pcre_static_flag
-  pcre_static_args = ['-DPCRE_STATIC']
-endif
-
 if use_system_pcre
-  pcre_deps = [pcre]
+  pcre_deps = [pcre2]
   pcre_objects = []
 else
   pcre_deps = []
   pcre_objects = [libpcre.extract_all_objects()]
 endif
 
-glib_c_args = ['-DG_LOG_DOMAIN="GLib"', '-DGLIB_COMPILATION'] + pcre_static_args + glib_hidden_visibility_args
+glib_c_args = ['-DG_LOG_DOMAIN="GLib"', '-DGLIB_COMPILATION'] + glib_hidden_visibility_args
 libglib = library('glib-2.0',
   glib_dtrace_obj, glib_dtrace_hdr,
   sources : [deprecated_sources, glib_sources],
@@ -377,7 +371,7 @@ libglib = library('glib-2.0',
   # intl.lib is not compatible with SAFESEH
   link_args : [noseh_link_args, glib_link_flags, win32_ldflags],
   include_directories : configinc,
-  dependencies : pcre_deps + [thread_dep, librt] + libintl_deps + libiconv + platform_deps + [gnulib_libm_dependency, libm] + [libsysprof_capture_dep],
+  dependencies : [pcre2, thread_dep, librt] + libintl_deps + libiconv + platform_deps + [gnulib_libm_dependency, libm] + [libsysprof_capture_dep],
   c_args : glib_c_args,
   objc_args : glib_c_args,
 )

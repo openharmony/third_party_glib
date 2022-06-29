@@ -78,8 +78,7 @@ glib_tests = {
   },
   'refstring' : {},
   'regex' : {
-    'dependencies' : [pcre],
-    'c_args' : use_pcre_static_flag ? ['-DPCRE_STATIC'] : [],
+    'dependencies' : [pcre2],
   },
   'rwlock' : {},
   'scannerapi' : {},
