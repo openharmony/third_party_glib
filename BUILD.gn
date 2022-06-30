@@ -2,6 +2,68 @@
 
 import("//build/ohos.gni")
 
+PCRE2_LIB_DIR = "//third_party/pcre2/pcre2"
+
+ohos_shared_library("glibpcre") {
+  exec_script("/usr/bin/env",
+              [
+                "cp",
+                rebase_path("$PCRE2_LIB_DIR/src/config.h.generic"),
+                rebase_path("$PCRE2_LIB_DIR/src/config.h"),
+              ])
+  exec_script("/usr/bin/env",
+              [
+                "cp",
+                rebase_path("$PCRE2_LIB_DIR/src/pcre2.h.generic"),
+                rebase_path("$PCRE2_LIB_DIR/src/pcre2.h"),
+              ])
+  exec_script("/usr/bin/env",
+              [
+                "cp",
+                rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c.dist"),
+                rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c"),
+              ])
+  sources = [
+    "$PCRE2_LIB_DIR/src/pcre2_auto_possess.c",
+    "$PCRE2_LIB_DIR/src/pcre2_chartables.c",
+    "$PCRE2_LIB_DIR/src/pcre2_compile.c",
+    "$PCRE2_LIB_DIR/src/pcre2_config.c",
+    "$PCRE2_LIB_DIR/src/pcre2_context.c",
+    "$PCRE2_LIB_DIR/src/pcre2_convert.c",
+    "$PCRE2_LIB_DIR/src/pcre2_dfa_match.c",
+    "$PCRE2_LIB_DIR/src/pcre2_error.c",
+    "$PCRE2_LIB_DIR/src/pcre2_extuni.c",
+    "$PCRE2_LIB_DIR/src/pcre2_find_bracket.c",
+    "$PCRE2_LIB_DIR/src/pcre2_jit_compile.c",
+    "$PCRE2_LIB_DIR/src/pcre2_maketables.c",
+    "$PCRE2_LIB_DIR/src/pcre2_match.c",
+    "$PCRE2_LIB_DIR/src/pcre2_match_data.c",
+    "$PCRE2_LIB_DIR/src/pcre2_newline.c",
+    "$PCRE2_LIB_DIR/src/pcre2_ord2utf.c",
+    "$PCRE2_LIB_DIR/src/pcre2_pattern_info.c",
+    "$PCRE2_LIB_DIR/src/pcre2_script_run.c",
+    "$PCRE2_LIB_DIR/src/pcre2_serialize.c",
+    "$PCRE2_LIB_DIR/src/pcre2_string_utils.c",
+    "$PCRE2_LIB_DIR/src/pcre2_study.c",
+    "$PCRE2_LIB_DIR/src/pcre2_substitute.c",
+    "$PCRE2_LIB_DIR/src/pcre2_substring.c",
+    "$PCRE2_LIB_DIR/src/pcre2_tables.c",
+    "$PCRE2_LIB_DIR/src/pcre2_ucd.c",
+    "$PCRE2_LIB_DIR/src/pcre2_valid_utf.c",
+    "$PCRE2_LIB_DIR/src/pcre2_xclass.c",
+  ]
+  include_dirs = [ "$PCRE2_LIB_DIR/src" ]
+  cflags = [
+    "-D_GNU_SOURCE",
+    "-DHAVE_CONFIG_H",
+    "-DSUPPORT_PCRE2_8=1",
+    "-DPCRE2_CODE_UNIT_WIDTH=8",
+    "-w",
+  ]
+  part_name = "multimedia_media_standard"
+  subsystem_name = "multimedia"
+}
+
 group("glib_packages") {
   deps = [
     ":ginotify",
@@ -18,10 +80,10 @@ config("glib_config") {
   include_dirs = [
     ".",
     "glib/libcharset",
-    "glib/pcre",
     "glib",
     "glib/deprecated",
     "//third_party/gettext/gettext-runtime/intl",
+    "//third_party/pcre2/pcre2/src",
   ]
   cflags = [
     "-DG_LOG_DOMAIN=\"GLib\"",
@@ -38,7 +100,7 @@ config("glib_config") {
     "-DMAX_DUPLENGTH=30000",
     "-DLINK_SIZE=2",
     "-DPOSIX_MALLOC_THRESHOLD=10",
-    "-DPCRE_STATIC",
+    "-DOHOS_OPT_COMPAT",
     "-UBSR_ANYCRLF",
     "-UEBCDIC",
     "-DGLIB_COMPILATION",
@@ -144,24 +206,6 @@ ohos_source_set("glib_source") {
     "glib/gversion.c",
     "glib/gwakeup.c",
     "glib/libcharset/localcharset.c",
-    "glib/pcre/pcre_byte_order.c",
-    "glib/pcre/pcre_chartables.c",
-    "glib/pcre/pcre_compile.c",
-    "glib/pcre/pcre_config.c",
-    "glib/pcre/pcre_dfa_exec.c",
-    "glib/pcre/pcre_exec.c",
-    "glib/pcre/pcre_fullinfo.c",
-    "glib/pcre/pcre_get.c",
-    "glib/pcre/pcre_globals.c",
-    "glib/pcre/pcre_jit_compile.c",
-    "glib/pcre/pcre_newline.c",
-    "glib/pcre/pcre_ord2utf8.c",
-    "glib/pcre/pcre_string_utils.c",
-    "glib/pcre/pcre_study.c",
-    "glib/pcre/pcre_tables.c",
-    "glib/pcre/pcre_valid_utf8.c",
-    "glib/pcre/pcre_version.c",
-    "glib/pcre/pcre_xclass.c",
   ]
 
   configs = [ ":glib_config" ]
@@ -170,6 +214,7 @@ ohos_shared_library("glib") {
   deps = [
     ":glib_source",
     "//third_party/gettext:libintl",
+    "//third_party/glib:glibpcre",
   ]
   part_name = "multimedia_media_standard"
   subsystem_name = "multimedia"

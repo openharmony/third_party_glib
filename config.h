@@ -399,8 +399,13 @@
 
 #define STATFS_ARGS 2
 
-/* Defined if strerror_r returns char * */
-#define STRERROR_R_CHAR_P 1
+#ifndef OHOS_OPT_COMPAT
+/*
+ * OHOS_OPT_COMPAT.0026
+ * strerror_r return null in RK platform, resulting in abnormal process
+ */
+#define STRERROR_R_CHAR_P 1  // Defined if strerror_r returns char *
+#endif
 
 #define THREADS_POSIX 1
 
