@@ -60,7 +60,7 @@ ohos_shared_library("glibpcre") {
     "-DPCRE2_CODE_UNIT_WIDTH=8",
     "-w",
   ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -216,7 +216,7 @@ ohos_shared_library("glib") {
     "//third_party/gettext:libintl",
     "//third_party/glib:glibpcre",
   ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -240,7 +240,7 @@ ohos_shared_library("gmodule") {
     ":glib",
     ":gmodule_source",
   ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -294,7 +294,7 @@ ohos_shared_library("gobject") {
     "//third_party/gettext:libintl",
     "//third_party/libffi:ffi",
   ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -596,7 +596,7 @@ ohos_shared_library("gio") {
     "//third_party/gettext:libintl",
     "//third_party/zlib:libz",
   ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -632,7 +632,7 @@ ohos_source_set("gxdgmime_source") {
 
 ohos_static_library("gxdgmime") {
   deps = [ ":gxdgmime_source" ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
 
@@ -667,6 +667,6 @@ ohos_source_set("ginotify_source") {
 
 ohos_static_library("ginotify") {
   deps = [ ":ginotify_source" ]
-  part_name = "multimedia_media_standard"
+  part_name = "multimedia_player_framework"
   subsystem_name = "multimedia"
 }
