@@ -291,7 +291,6 @@ ohos_shared_library("gobject") {
   deps = [
     ":glib",
     ":gobject_source",
-    "//third_party/gettext:libintl",
     "//third_party/libffi:ffi",
   ]
   part_name = "multimedia_player_framework"
