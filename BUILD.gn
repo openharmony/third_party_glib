@@ -242,7 +242,7 @@ ohos_source_set("glib_source") {
 ohos_shared_library("glib") {
   deps = [
     ":glib_source",
-    "//third_party/gettext:libintl",
+    "//third_party/gettext:libgettext",
     "//third_party/glib:glibpcre",
   ]
   part_name = "multimedia_player_framework"
@@ -621,7 +621,7 @@ ohos_shared_library("gio") {
     ":gmodule",
     ":gobject",
     ":gxdgmime",
-    "//third_party/gettext:libintl",
+    "//third_party/gettext:libgettext",
     "//third_party/zlib:libz",
   ]
   part_name = "multimedia_player_framework"
