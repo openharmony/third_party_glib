@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 void __attribute__((visibility("default"))) GMemAllocDfx(void *mem, unsigned int size);
-void __attribute__((visibility("default"))) GChainMemFreeDfx(void *mem_chain, uint64_t next_offset);
+void __attribute__((visibility("default"))) GChainMemFreeDfx(void *mem_chain, unsigned long next_offset);
 void __attribute__((visibility("default"))) GMemFreeDfx(void *mem);
 
 #ifdef __cplusplus
