@@ -84,9 +84,10 @@ void GChainMemFreeDfx(void *mem_chain, unsigned long next_offset)
             return;
         }
     }
-    while (mem_chain) {
-        void *current = mem_chain;
-        mem_chain = current + next_offset;
+    char *next = (char *)mem_chain;
+    while (next) {
+        char *current = next;
+        next = current + next_offset;
         GMemFreeDfx(current);
     }
 }
