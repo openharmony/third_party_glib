@@ -76,7 +76,7 @@ void GMemAllocDfx(void *mem, unsigned int size)
     memMap[mem] = {memCount++, size, str, (intptr_t)mem};
 }
 
-void GChainMemFreeDfx(void *mem_chain, gsize next_offset)
+void GChainMemFreeDfx(void *mem_chain, uint64_t next_offset)
 {
     {
         std::lock_guard<std::mutex> lock(mutex);
