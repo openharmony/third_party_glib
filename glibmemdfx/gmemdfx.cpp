@@ -78,24 +78,24 @@ void GMemAllocDfx(void *mem, unsigned int size)
 
 void GChainMemFreeDfx(void *mem_chain, unsigned long next_offset)
 {
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (!dumpOpen) {
-            return;
-        }
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!dumpOpen || next_offset == 0 || mem_chain == nullptr) {
+        return;
     }
-    char *next = (char *)mem_chain;
+    uint8_t *next = reinterpret_cast<uint8_t *>(mem_chain);
     while (next) {
-        char *current = next;
+        uint8_t *current = next;
         next = current + next_offset;
-        GMemFreeDfx(current);
+        if (current != nullptr && memMap.erase(current) == 0) {
+            LOGE("the mem 0x%{public}06" PRIXPTR " is already free", FAKE_POINTER(current));
+        }
     }
 }
 
 void GMemFreeDfx(void *mem)
 {
     std::lock_guard<std::mutex> lock(mutex);
-    if (!dumpOpen) {
+    if (!dumpOpen || mem == nullptr) {
         return;
     }
     if (mem != nullptr && memMap.erase(mem) == 0) {

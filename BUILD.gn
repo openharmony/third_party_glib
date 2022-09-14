@@ -713,8 +713,6 @@ config("g_mem_dfx_config") {
 }
 
 ohos_shared_library("g_mem_dfx") {
-  install_enable = true
-
   sources = [
     "glibmemdfx/gmemdfx.cpp",
   ]
@@ -752,6 +750,6 @@ ohos_shared_library("g_mem_dfx") {
     "init:libbegetutil",
   ]
 
-  subsystem_name = "glib"
-  part_name = "thirdparty"
+  subsystem_name = "thirdparty"
+  part_name = "glib"
 }
