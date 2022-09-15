@@ -82,10 +82,10 @@ void GChainMemFreeDfx(void *mem_chain, unsigned long next_offset)
     if (!dumpOpen || next_offset == 0 || mem_chain == nullptr) {
         return;
     }
-    uint8_t *next = reinterpret_cast<uint8_t *>(mem_chain);
+    void *next = mem_chain;
     while (next) {
-        uint8_t *current = next;
-        next = current + next_offset;
+        uint8_t *current = (uint8_t *)next;
+        next = *(void **)(current + next_offset);
         if (current != nullptr && memMap.erase(current) == 0) {
             LOGE("the mem 0x%{public}06" PRIXPTR " is already free", FAKE_POINTER(current));
         }
