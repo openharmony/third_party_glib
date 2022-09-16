@@ -51,6 +51,18 @@
 
 #include "gvalgrind.h"
 
+#include "gmemdfx.h"
+
+#if defined(G_MEM_DFX)
+
+#define DFX_TRACE(probe) probe
+
+#else
+
+#define DFX_TRACE(probe)
+
+#endif
+
 /**
  * SECTION:memory_slices
  * @title: Memory Slices
@@ -1071,7 +1083,7 @@ g_slice_alloc (gsize mem_size)
     smc_notify_alloc (mem, mem_size);
 
   TRACE (GLIB_SLICE_ALLOC((void*)mem, mem_size));
-
+  DFX_TRACE(GMemAllocDfx((void *)mem, (unsigned int)mem_size));
   return mem;
 }
 
@@ -1180,6 +1192,7 @@ g_slice_free1 (gsize    mem_size,
       g_free (mem_block);
     }
   TRACE (GLIB_SLICE_FREE((void*)mem_block, mem_size));
+  DFX_TRACE(GMemFreeDfx((void *)mem_block));
 }
 
 /**
@@ -1207,6 +1220,7 @@ g_slice_free_chain_with_offset (gsize    mem_size,
                                 gpointer mem_chain,
                                 gsize    next_offset)
 {
+  DFX_TRACE(GChainMemFreeDfx((void *)mem_chain, next_offset));
   gpointer slice = mem_chain;
   /* while the thread magazines and the magazine cache are implemented so that
    * they can easily be extended to allow for free lists containing more free
