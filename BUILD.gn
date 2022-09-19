@@ -706,7 +706,7 @@ ohos_static_library("ginotify") {
 config("g_mem_dfx_config") {
   include_dirs = [
     "glibmemdfx",
-    "//utils/native/base/include",
+    "//commonlibrary/c_utils/base/include",
     "//foundation/multimedia/media_standard/interfaces/inner_api/native",
     "//base/hiviewdfx/hisysevent/interfaces/native/innerkits/hisysevent/include",
   ]
