@@ -692,6 +692,7 @@ magazine_chain_prepare_fields (ChunkLink *magazine_chunks)
  * ohos.opt.performance.0004
  * fix glib cache too large problem. when thread exit, release mem no user.
  */
+static void
 magazine_cache_trim (Allocator *allocator,
                      guint      ix,
                      guint      stamp,
@@ -802,6 +803,7 @@ magazine_cache_trim (Allocator *allocator,
  * ohos.opt.performance.0004
  * fix glib cache too large problem. when thread exit, release mem no user.
  */
+static void
 magazine_cache_push_magazine (guint      ix,
                               ChunkLink *magazine_chunks,
                               gsize      count,
