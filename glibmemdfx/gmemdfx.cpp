@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <vector>
 #include <hilog/log.h>
+#include <unistd.h>
 #include "gmemdfxdump.h"
 #include "dfx_dump_catcher.h"
 #include "param_wrapper.h"
@@ -35,23 +36,58 @@
 #define POINTER_MASK 0x00FFFFFF
 #define FAKE_POINTER(addr) (POINTER_MASK & reinterpret_cast<uintptr_t>(addr))
 
-struct memInfo {
+struct MemInfo {
     uint64_t count = 0;
     uint64_t size = 0;
     std::string str;
     intptr_t mem;
 };
 
+struct PoolInfo {
+    uint64_t count = 0;
+    uint64_t size = 0;
+    uint64_t alignment = 0;
+    uint64_t lastTid = 0;
+    intptr_t mem;
+};
+
 namespace {
     constexpr OHOS::HiviewDFX::HiLogLabel LABEL = {LOG_CORE, LOG_DOMAIN, "AVGlibMemDfx"};
-    static std::unordered_map<void *, memInfo> memMap;
+    static std::unordered_map<void *, MemInfo> memMap;
+    static std::unordered_map<void *, PoolInfo> poolMap;
     static uint64_t memCount = 0;
+    static uint64_t poolCount = 0;
     static std::mutex mutex;
     static bool enableDump = false;
     static unsigned int dumpSize = 0;
     static unsigned int dumpStart = 0;
     static unsigned int dumpCount = 0;
     static bool dumpOpen = false;
+}
+
+void GMemPoolAllocDfx(void *mem, unsigned int alignment, unsigned int size)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!dumpOpen || mem == nullptr) {
+        return;
+    }
+    if (poolMap.find(mem) != poolMap.end()) {
+        LOGE("the mem 0x%{public}06" PRIXPTR " is already allocated", FAKE_POINTER(mem));
+        return;
+    }
+
+    poolMap[mem] = {poolCount++, size, alignment, gettid(), (intptr_t)mem};
+}
+
+void GMemPoolFreeDfx(void *mem)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    if (!dumpOpen || mem == nullptr) {
+        return;
+    }
+    if (mem != nullptr && poolMap.erase(mem) == 0) {
+        LOGE("the mem 0x%{public}06" PRIXPTR " is already free", FAKE_POINTER(mem));
+    }
 }
 
 void GMemAllocDfx(void *mem, unsigned int size)
@@ -79,7 +115,7 @@ void GMemAllocDfx(void *mem, unsigned int size)
 void GChainMemFreeDfx(void *mem_chain, unsigned long next_offset)
 {
     std::lock_guard<std::mutex> lock(mutex);
-    if (!dumpOpen || next_offset == 0 || mem_chain == nullptr) {
+    if (!dumpOpen || mem_chain == nullptr) {
         return;
     }
     void *next = mem_chain;
@@ -144,13 +180,13 @@ void InitParameter()
 
 void GetGMemDump(std::string &str)
 {
-    std::unordered_map<void *, memInfo> memMapCopy;
+    std::unordered_map<void *, MemInfo> memMapCopy;
     {
         std::lock_guard<std::mutex> lock(mutex);
         InitParameter();
         memMapCopy = memMap;
     }
-    std::vector<std::pair<void *, memInfo>> memInfoVec(memMapCopy.begin(), memMapCopy.end());
+    std::vector<std::pair<void *, MemInfo>> memInfoVec(memMapCopy.begin(), memMapCopy.end());
     std::sort(memInfoVec.begin(), memInfoVec.end(), [&](auto &left, auto &right) {
         return left.second.count < right.second.count;
     });
@@ -160,5 +196,29 @@ void GetGMemDump(std::string &str)
         str += "size:";
         str += std::to_string(iter->second.size) + "\n";
         str += iter->second.str + "\n";
+    }
+}
+
+void GetGMemPoolDump(std::string &str)
+{
+    std::unordered_map<void *, PoolInfo> poolMapCopy;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        InitParameter();
+        poolMapCopy = poolMap;
+    }
+    std::vector<std::pair<void *, PoolInfo>> poolInfoVec(poolMapCopy.begin(), poolMapCopy.end());
+    std::sort(poolInfoVec.begin(), poolInfoVec.end(), [&](auto &left, auto &right) {
+        return left.second.count < right.second.count;
+    });
+    for (auto iter = poolInfoVec.begin(); iter != poolInfoVec.end(); iter++) {
+        str += "count:";
+        str += std::to_string(iter->second.count) + ";";
+        str += "size:";
+        str += std::to_string(iter->second.size) + "\n";
+        str += "alignment:";
+        str += std::to_string(iter->second.alignment) + "\n";
+        str += "lastTid:";
+        str += std::to_string(iter->second.lastTid) + "\n";
     }
 }
