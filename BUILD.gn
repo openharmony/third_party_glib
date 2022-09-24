@@ -140,6 +140,7 @@ config("glib_config") {
     "-Wno-unused-function",
     "-Wno-int-conversion",
     "-DG_MEM_DFX",
+    "-DOHOS_OPT_PERFORMANCE",
   ]
 }
 
