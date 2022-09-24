@@ -1468,6 +1468,7 @@ allocator_memalign (gsize alignment,
   gint err = ENOMEM;
 #if     HAVE_POSIX_MEMALIGN
   err = posix_memalign (&aligned_memory, alignment, memsize);
+  DFX_TRACE(GMemPoolAllocDfx(aligned_memory, alignment, memsize));
 #elif   HAVE_MEMALIGN
   errno = 0;
   aligned_memory = memalign (alignment, memsize);
@@ -1511,6 +1512,7 @@ allocator_memfree (gsize    memsize,
                    gpointer mem)
 {
 #if     HAVE_POSIX_MEMALIGN || HAVE_MEMALIGN || HAVE_VALLOC
+  DFX_TRACE(GMemPoolFreeDfx(mem));
   free (mem);
 #else
   mem_assert (memsize <= sys_page_size);
