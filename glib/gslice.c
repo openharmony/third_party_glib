@@ -687,6 +687,63 @@ magazine_chain_prepare_fields (ChunkLink *magazine_chunks)
 #define magazine_chain_next(mc)         ((mc)->next->next->data)
 #define magazine_chain_count(mc)        ((mc)->next->next->next->data)
 
+#ifdef OHOS_OPT_PERFORMANCE
+/*
+ * ohos.opt.performance.0004
+ * fix glib cache too large problem. when thread exit, release mem no user.
+ */
+magazine_cache_trim (Allocator *allocator,
+                     guint      ix,
+                     guint      stamp,
+                     gboolean release)
+{
+  /* g_mutex_lock (allocator->mutex); done by caller */
+  /* trim magazine cache from tail */
+  ChunkLink *current = magazine_chain_prev (allocator->magazines[ix]);
+  ChunkLink *trash = NULL;
+  while (!G_APPROX_VALUE(stamp, magazine_chain_uint_stamp (current),
+                         allocator->config.working_set_msecs) || release)
+    {
+      /* unlink */
+      ChunkLink *prev = magazine_chain_prev (current);
+      ChunkLink *next = magazine_chain_next (current);
+      magazine_chain_next (prev) = next;
+      magazine_chain_prev (next) = prev;
+      /* clear special fields, put on trash stack */
+      magazine_chain_next (current) = NULL;
+      magazine_chain_count (current) = NULL;
+      magazine_chain_stamp (current) = NULL;
+      magazine_chain_prev (current) = trash;
+      trash = current;
+      /* fixup list head if required */
+      if (current == allocator->magazines[ix])
+        {
+          allocator->magazines[ix] = NULL;
+          break;
+        }
+      current = prev;
+    }
+  g_mutex_unlock (&allocator->magazine_mutex);
+  /* free trash */
+  if (trash)
+    {
+      const gsize chunk_size = SLAB_CHUNK_SIZE (allocator, ix);
+      g_mutex_lock (&allocator->slab_mutex);
+      while (trash)
+        {
+          current = trash;
+          trash = magazine_chain_prev (current);
+          magazine_chain_prev (current) = NULL; /* clear special field */
+          while (current)
+            {
+              ChunkLink *chunk = magazine_chain_pop_head (&current);
+              slab_allocator_free_chunk (chunk_size, chunk);
+            }
+        }
+      g_mutex_unlock (&allocator->slab_mutex);
+    }
+}
+#else
 static void
 magazine_cache_trim (Allocator *allocator,
                      guint      ix,
@@ -738,7 +795,41 @@ magazine_cache_trim (Allocator *allocator,
       g_mutex_unlock (&allocator->slab_mutex);
     }
 }
+#endif
 
+#ifdef OHOS_OPT_PERFORMANCE
+/*
+ * ohos.opt.performance.0004
+ * fix glib cache too large problem. when thread exit, release mem no user.
+ */
+magazine_cache_push_magazine (guint      ix,
+                              ChunkLink *magazine_chunks,
+                              gsize      count,
+                              gboolean release) /* must be >= MIN_MAGAZINE_SIZE */
+{
+  ChunkLink *current = magazine_chain_prepare_fields (magazine_chunks);
+  ChunkLink *next, *prev;
+  g_mutex_lock (&allocator->magazine_mutex);
+  /* add magazine at head */
+  next = allocator->magazines[ix];
+  if (next)
+    prev = magazine_chain_prev (next);
+  else
+    next = prev = current;
+  magazine_chain_next (prev) = current;
+  magazine_chain_prev (next) = current;
+  magazine_chain_prev (current) = prev;
+  magazine_chain_next (current) = next;
+  magazine_chain_count (current) = (gpointer) count;
+  /* stamp magazine */
+  magazine_cache_update_stamp();
+  magazine_chain_stamp (current) = GUINT_TO_POINTER (allocator->last_stamp);
+  allocator->magazines[ix] = current;
+  /* free old magazines beyond a certain threshold */
+  magazine_cache_trim (allocator, ix, allocator->last_stamp, release);
+  /* g_mutex_unlock (allocator->mutex); was done by magazine_cache_trim() */
+}
+#else
 static void
 magazine_cache_push_magazine (guint      ix,
                               ChunkLink *magazine_chunks,
@@ -766,7 +857,7 @@ magazine_cache_push_magazine (guint      ix,
   magazine_cache_trim (allocator, ix, allocator->last_stamp);
   /* g_mutex_unlock (allocator->mutex); was done by magazine_cache_trim() */
 }
-
+#endif
 static ChunkLink*
 magazine_cache_pop_magazine (guint  ix,
                              gsize *countp)
@@ -830,7 +921,15 @@ private_thread_memory_cleanup (gpointer data)
         {
           Magazine *mag = mags[j];
           if (mag->count >= MIN_MAGAZINE_SIZE)
+#ifdef OHOS_OPT_PERFORMANCE
+/*
+ * ohos.opt.performance.0004
+ * fix glib cache too large problem. when thread exit, release mem no user.
+ */
+            magazine_cache_push_magazine (ix, mag->chunks, mag->count, TRUE);
+#else
             magazine_cache_push_magazine (ix, mag->chunks, mag->count);
+#endif
           else
             {
               const gsize chunk_size = SLAB_CHUNK_SIZE (allocator, ix);
@@ -862,7 +961,15 @@ thread_memory_magazine2_unload (ThreadMemory *tmem,
                                 guint         ix)
 {
   Magazine *mag = &tmem->magazine2[ix];
+#ifdef OHOS_OPT_PERFORMANCE
+/*
+ * ohos.opt.performance.0004
+ * fix glib cache too large problem. when thread exit, release mem no user.
+ */
+  magazine_cache_push_magazine (ix, mag->chunks, mag->count, FALSE);
+#else
   magazine_cache_push_magazine (ix, mag->chunks, mag->count);
+#endif
   mag->chunks = NULL;
   mag->count = 0;
 }
