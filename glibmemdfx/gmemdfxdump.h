@@ -18,5 +18,6 @@
 #include <memory>
 
 void __attribute__((visibility("default"))) GetGMemDump(std::string &str);
+void __attribute__((visibility("default"))) GetGMemPoolDump(std::string &str);
 
 #endif
