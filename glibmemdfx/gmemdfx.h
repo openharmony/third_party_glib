@@ -23,6 +23,8 @@ void __attribute__((visibility("default"))) GMemAllocDfx(void *mem, unsigned int
 void __attribute__((visibility("default"))) GChainMemFreeDfx(void *mem_chain, unsigned long next_offset);
 void __attribute__((visibility("default"))) GMemFreeDfx(void *mem);
 
+void __attribute__((visibility("default"))) GMemPoolAllocDfx(void *mem, unsigned int alignment, unsigned int size);
+void __attribute__((visibility("default"))) GMemPoolFreeDfx(void *mem);
 #ifdef __cplusplus
 }
 #endif
