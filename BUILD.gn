@@ -139,9 +139,13 @@ config("glib_config") {
     "-Wno-unused-value",
     "-Wno-unused-function",
     "-Wno-int-conversion",
-    "-DG_MEM_DFX",
-    "-DOHOS_OPT_PERFORMANCE",
   ]
+  if (is_standard_system) {
+    cflags += [
+      "-DG_MEM_DFX",
+      "-DOHOS_OPT_PERFORMANCE",
+    ]
+  }
 }
 
 ohos_source_set("glib_source") {
@@ -245,11 +249,13 @@ ohos_source_set("glib_source") {
 }
 ohos_shared_library("glib") {
   deps = [
-    ":g_mem_dfx",
     ":glib_source",
     "//third_party/gettext:libgettext",
     "//third_party/glib:glibpcre",
   ]
+  if (is_standard_system) {
+    deps += [ ":g_mem_dfx" ]
+  }
   part_name = "glib"
   subsystem_name = "thirdparty"
 }
