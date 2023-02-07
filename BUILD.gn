@@ -111,7 +111,6 @@ config("glib_config") {
     "glib/libcharset",
     "glib",
     "glib/deprecated",
-    "//third_party/gettext/gettext-runtime/intl",
     "//third_party/pcre2/pcre2/src",
     "//foundation/multimedia/media_standard/services/utils",
     "glibmemdfx",
@@ -250,7 +249,6 @@ ohos_source_set("glib_source") {
 ohos_shared_library("glib") {
   deps = [
     ":glib_source",
-    "//third_party/gettext:libgettext",
     "//third_party/glib:glibpcre",
   ]
   if (is_standard_system) {
@@ -291,7 +289,6 @@ config("gobject_config") {
     "gobject",
     "glib",
     "//third_party/libffi/include",
-    "//third_party/gettext/gettext-runtime/intl",
   ]
   cflags = [
     "-DG_LOG_DOMAIN=\"GObject\"",
@@ -350,7 +347,6 @@ config("gio_config") {
     "gio/xdgmime",
     "gio/inotify",
     "gmodule",
-    "//third_party/gettext/gettext-runtime/intl",
     "//third_party/zlib",
   ]
   cflags = [
@@ -632,7 +628,6 @@ ohos_shared_library("gio") {
     ":gmodule",
     ":gobject",
     ":gxdgmime",
-    "//third_party/gettext:libgettext",
     "//third_party/zlib:libz",
   ]
   part_name = "glib"
