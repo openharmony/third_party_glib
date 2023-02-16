@@ -19,7 +19,12 @@
 #define ALIGNOF_UNSIGNED_LONG 4
 #endif
 
+#ifndef OHOS_OPT_COMPAT
+/* ohos.opt.compat.001:
+ * Remove dependency to gettext
+ */
 #define ENABLE_NLS 1
+#endif
 
 #define EXEEXT
 
