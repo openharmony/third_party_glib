@@ -20,7 +20,12 @@
 
 #include <glib.h>
 
+#ifndef OHOS_OPT_COMPAT
+/* ohos.opt.compat.001:
+ * Remove dependency to gettext
+ */
 #include <libintl.h>
+#endif
 #include <string.h>
 
 #ifndef GETTEXT_PACKAGE

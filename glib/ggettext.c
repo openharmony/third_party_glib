@@ -40,7 +40,12 @@
 
 #include <string.h>
 #include <locale.h>
+#ifndef OHOS_OPT_COMPAT
+/* ohos.opt.compat.001:
+ * Remove dependency to gettext
+ */
 #include <libintl.h>
+#endif
 
 #ifdef G_OS_WIN32
 
