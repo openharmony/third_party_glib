@@ -12,5 +12,6 @@ if [ -d "glib-2.68.1" ];then
     rm -rf glib-2.68.1
 fi
 tar -xvf glib-2.68.1.tar.xz
+cd glib-2.68.1
 patch -p1 < $1/backport-lib-openharmony-glib.patch
 exit 0
