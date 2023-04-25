@@ -108,7 +108,7 @@ config("glib_config") {
   visibility = [ ":*" ]
   include_dirs = [
     "glib-2.68.1",
-    "glib-2.68.1/libcharset",
+    "glib-2.68.1/glib/libcharset",
     "glib-2.68.1/glib",
     "glib-2.68.1/glib/deprecated",
     "//third_party/pcre2/pcre2/src",
