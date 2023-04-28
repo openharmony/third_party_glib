@@ -16,7 +16,7 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name OAT.xml\
     -o -name README.OpenSource\
     -o -name ".*" \)\
-    -print -exec rm -rf {} \;
+    -prune -print -exec rm -rf {} \;
 tar -zxvf patch.tar.gz
 tar -xvf glib-2.68.1.tar.xz
 mv glib-2.68.1/* .
