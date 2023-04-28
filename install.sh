@@ -12,6 +12,9 @@ find . ! -path "*/\.*" ! \( -name config.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name BUILD.gn\
     -o -name config.gni\
     -o -name install.sh\
+    -o -name bundle.json\
+    -o -name OAT.xml\
+    -o -name README.OpenSource\
     -o -name ".*" \)\
     -print -exec rm -rf {} \;
 tar -zxvf config.tar.gz
