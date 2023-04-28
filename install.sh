@@ -8,7 +8,7 @@
 
 set -e
 cd $1
-find . ! -path "*/\.*" ! \( -name config.tar.gz -o -name glib-2.68.1.tar.xz\
+find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name BUILD.gn\
     -o -name config.gni\
     -o -name install.sh\
@@ -17,7 +17,7 @@ find . ! -path "*/\.*" ! \( -name config.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name README.OpenSource\
     -o -name ".*" \)\
     -print -exec rm -rf {} \;
-tar -zxvf config.tar.gz
+tar -zxvf patch.tar.gz
 tar -xvf glib-2.68.1.tar.xz
 mv glib-2.68.1/* .
 rm -rf glib-2.68.1
