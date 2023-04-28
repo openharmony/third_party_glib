@@ -8,10 +8,12 @@
 
 set -e
 cd $1
-if [ -d "glib-2.68.1" ];then
-    rm -rf glib-2.68.1
-fi
+find . ! -path "*/\.*" ! \( -name config.tar.gz -o -name glib-2.68.1.tar.xz\
+    -o -name BUILD.gn -o -name install.sh -o -name ".*" \) -print -exec rm -rf {} \;
+tar -zxvf config.tar.gz
 tar -xvf glib-2.68.1.tar.xz
-cd glib-2.68.1
-patch -p1 < $1/backport-lib-openharmony-glib.patch
+mv glib-2.68.1/* .
+rm -rf glib-2.68.1
+patch -p1 < backport-lib-openharmony-glib.patch
 exit 0
+
