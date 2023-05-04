@@ -15,6 +15,7 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name bundle.json\
     -o -name OAT.xml\
     -o -name README.OpenSource\
+    -o -name glib2.spec\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
 tar -zxvf patch.tar.gz
@@ -22,5 +23,7 @@ tar -xvf glib-2.68.1.tar.xz
 mv glib-2.68.1/* .
 rm -rf glib-2.68.1
 patch -p1 < backport-lib-openharmony-glib.patch
+patch -p1 < backport-correctly-use-3-parameters-for-clise-range.patch
+patch -p1 < backport-fix-a-memory-leak.patch
 exit 0
 
