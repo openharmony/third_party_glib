@@ -12,5 +12,5 @@
 # limitations under the License.
 
 declare_args() {
-    GLIB_DIR = "."
+  GLIB_DIR = "."
 }
