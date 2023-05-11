@@ -1,6 +1,10 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2021. All rights reserved.
 
 import("//build/ohos.gni")
+import("config.gni")
+
+glib_path = rebase_path("//third_party/glib")
+exec_script("install.sh", [ "$glib_path" ])
 
 PCRE2_LIB_DIR = "//third_party/pcre2/pcre2"
 
