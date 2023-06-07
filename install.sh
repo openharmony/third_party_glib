@@ -17,14 +17,22 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name README.OpenSource\
     -o -name glib2.spec\
     -o -name COPYING\
+    -o -name backport-patch.log\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
 tar -zxvf patch.tar.gz
 tar -xvf glib-2.68.1.tar.xz
 mv glib-2.68.1/* .
 rm -rf glib-2.68.1
-patch -p1 < backport-lib-openharmony-glib.patch
-patch -p1 < backport-correctly-use-3-parameters-for-clise-range.patch
-patch -p1 < backport-fix-a-memory-leak.patch
+echo "reset working dir success"
+file="backport-patch.log"
+exec < $file
+while read line
+do
+    line=${line:15}
+    echo $line
+    patch -p1 < $line --fuzz=0 --no-backup-if-mismatch
+done
+echo "all file patch success!"
 exit 0
 
