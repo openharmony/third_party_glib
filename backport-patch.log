@@ -59,4 +59,4 @@ Patch6057:      backport-Revert-Handling-collision-between-standard-i-o-filedesc
 patch6058:	    backport-gdbusinterfaceskeleton-Fix-a-use-after-free-of-a-GDBusMethodInvocation.patch
 patch6059:	    backport-CVE-2023-24593_CVE-2023-25180-1.patch
 patch6060:	    backport-CVE-2023-24593_CVE-2023-25180-2.patch
-patch6061:      backport-lib-openharmony-glib.patch
+patch9000:      backport-lib-openharmony-glib.patch
