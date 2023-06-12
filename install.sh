@@ -8,6 +8,7 @@
 
 set -e
 cd $1
+# tar -zcvf patch.tar.gz *.patch
 find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name BUILD.gn\
     -o -name config.gni\
