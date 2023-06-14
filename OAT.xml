@@ -59,14 +59,30 @@ Note:If the text contains special characters, please escape them according to th
         <licensefile>COPYING</licensefile>
         <policylist>
             <policy name="projectPolicy" desc="">
+                <policyitem type="license" name="LGPLStyleLicense" path="install.sh" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="License Header Invalid, not linked"/>
+                <policyitem type="license" name="LGPL-2.1+" path="COPYING" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="License File"/>
+                <policyitem type="license" name="NoLicenseHeader" path="BUILD.gn" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="GN file"/>
+                <policyitem type="license" name="NoLicenseHeader" path="README.*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="README"/>
+                <policyitem type="license" name="NoLicenseHeader" path=".dir-locals.el" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="License Header Invalid"/>
+                <policyitem type="license" name="InvalidLicense" path="glib2.spec" rule="may" group="defaultGroup" desc="The files involved in compilation are the InvalidLicense protocol.They are used in dynamic link mode."/>
+                <policyitem type="copyright" name="NULL" path=".dir-locals.el" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked"/>
+                <policyitem type="copyright" name="InvalidCopyright" path="BUILD.gn" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="GN file"/>
+                <policyitem type="copyright" name="NULL" path="glib2.spec" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked, not linked"/>
+                <policyitem type="copyright" name="NULL" path="README.*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="README"/>
+                <policyitem type="copyright" name="InvalidCopyright" path="install.sh" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked"/>
             </policy>
         </policylist>
         <filefilterlist>
-            <filefilter name="defaultPolicyFilter" desc="Filters for compatibility，license header policies">
-                <filteritem type="filepath" name=".*" desc="The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
+            <filefilter name="defaultPolicyFilter" desc="Filters for compatibility, license header policies">
+                <filteritem type="filepath" name="README.OpenSource" desc="OpenSource README, not linked."/>
+                <filteritem type="filepath" name="glib-2.68.1.tar.xz" desc="OpenEuler:glib2 code. The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
-                <filteritem type="filepath" name=".*" desc="Resource, config and certification binary."/>
+                <filteritem type="filepath" name="BUILG.gn" desc="openEuler:glib2 build gn file."/>
+                <filteritem type="filepath" name="glib2.spec" desc="openEuler:glib2 spec."/>
+                <filteritem type="filepath" name="patch.tar.gz" desc="openEuler:glib2 origin patch."/>
+                <filteritem type="filepath" name="backport-patch.log" desc="openEuler:glib2 origin patch files name."/>
+                <filteritem type="filepath" name="glib-2.68.1.tar.xz" desc="openEuler:glib2 code."/>
             </filefilter>
         </filefilterlist>
     </oatconfig>

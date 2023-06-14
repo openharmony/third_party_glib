@@ -19,6 +19,8 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name glib2.spec\
     -o -name COPYING\
     -o -name backport-patch.log\
+    -o -name "README*"\
+    -o -name CONTRIBUTING.md\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
 tar -zxvf patch.tar.gz
