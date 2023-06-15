@@ -1,9 +1,4 @@
 #!/bin/bash
-# This library is free software; you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public
-# License as published by the Free Software Foundation version 2.1
-# of the License.
-#
 # Copyright(c) 2023 Huawei Device Co., Ltd.
 
 set -e
@@ -19,6 +14,8 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name glib2.spec\
     -o -name COPYING\
     -o -name backport-patch.log\
+    -o -name "README*"\
+    -o -name CONTRIBUTING.md\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
 tar -zxvf patch.tar.gz
