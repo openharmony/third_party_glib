@@ -57,27 +57,103 @@ Note:If the text contains special characters, please escape them according to th
 <configuration>
     <oatconfig>
         <licensefile>COPYING</licensefile>
+        <licensematcherlist>
+            <licensematcher name="BSD-3-Clause" desc="License for BSD-3-Clause">
+                <licensetext name="
+                    * This work is provided &gt;as is&gt;; redistribution and modification
+                    * in whole or in part, in any medium, physical or electronic is
+                    * permitted without restriction.
+                    *
+                    * This work is distributed in the hope that it will be useful,
+                    * but WITHOUT ANY WARRANTY; without even the implied warranty of
+                    * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+                    *
+                    * In no event shall the authors or contributors be liable for any
+                    * direct, indirect, incidental, special, exemplary, or consequential
+                    * damages (including, but not limited to, procurement of substitute
+                    * goods or services; loss of use, data, or profits; or business
+                    * interruption) however caused and on any theory of liability, whether
+                    * in contract, strict liability, or tort (including negligence or
+                    * otherwise) arising in any way out of the use of this software, even
+                    * if advised of the possibility of such damage.
+                " desc=""/>
+            </licensematcher>
+            <licensematcher name="BSD-3-Clause" desc="License for BSD-3-Clause">
+                <licensetext name="
+                    * This software is provided &gt;as is&gt; redistribution and modification
+                    * is permitted, provided that the following disclaimer is retained.
+                    *
+                    * This software is distributed in the hope that it will be useful,
+                    * but WITHOUT ANY WARRANTY; without even the implied warranty of
+                    * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+                    * In no event shall the authors or contributors be liable for any
+                    * direct, indirect, incidental, special, exemplary, or consequential
+                    * damages (including, but not limited to, procurement of substitute
+                    * goods or services; loss of use, data, or profits; or business
+                    * interruption) however caused and on any theory of liability, whether
+                    * in contract, strict liability, or tort (including negligence or
+                    * otherwise) arising in any way out of the use of this software, even
+                    * if advised of the possibility of such damage.
+                " desc=""/>
+            </licensematcher>
+            <licensematcher name="LGPL" desc="License for LGPL">
+                <licensetext name="
+                    * Licensed under the Academic Free License version 2.0
+                    * Or under the following terms:
+                    *
+                    * This library is free software; you can redistribute it and/or
+                    * modify it under the terms of the GNU Lesser General Public
+                    * License as published by the Free Software Foundation; either
+                    * version 2.1 of the License, or (at your option) any later version.
+                    *
+                    * This library is distributed in the hope that it will be useful,
+                    * but WITHOUT ANY WARRANTY; without even the implied warranty of
+                    * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
+                    * Lesser General Public License for more details.
+                    *
+                    * You should have received a copy of the GNU Lesser General Public
+                    * License along with this library; if not, see &lt;http://www.gnu.org/licenses/&gt;.
+                " desc=""/>
+            </licensematcher>
+        </licensematcherlist>
         <policylist>
             <policy name="projectPolicy" desc="">
-                <policyitem type="license" name="NoLicenseHeader" path="install.sh" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="NoLicenseHeader, not linked"/>
-                <policyitem type="license" name="LGPL-2.1+" path="COPYING" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="License File"/>
-                <policyitem type="license" name="NoLicenseHeader" path="BUILD.gn" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="GN file"/>
-                <policyitem type="license" name="NoLicenseHeader" path="README.*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="README"/>
-                <policyitem type="license" name="NoLicenseHeader" path=".dir-locals.el" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc="NoLicenseHeader, not linked"/>
-                <policyitem type="license" name="InvalidLicense" path="glib2.spec" rule="may" group="defaultGroup" desc="The files involved in compilation are the InvalidLicense protocol.They are used in dynamic link mode."/>
-                <policyitem type="copyright" name="NULL" path=".dir-locals.el" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked"/>
-                <policyitem type="copyright" name="InvalidCopyright" path="BUILD.gn" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="GN file"/>
-                <policyitem type="copyright" name="NULL" path="glib2.spec" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked, not linked"/>
-                <policyitem type="copyright" name="NULL" path="README.*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="README"/>
-                <policyitem type="copyright" name="InvalidCopyright" path="install.sh" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc="Copyright Header Invalid, not linked"/>
+                <policyitem type="compatibility" name="LGPL" path=".*" rule="may" group="defaultGroup" desc="The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
             </policy>
         </policylist>
         <filefilterlist>
             <filefilter name="defaultPolicyFilter" desc="Filters for compatibility, license header policies">
+                <filteritem type="filename" name="*.m4" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.po" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.doap" desc="This file is not used."/>
+                <filteritem type="filename" name="*.py" desc="This file is not used."/>
+                <filteritem type="filename" name="*.sh" desc="This file is not used."/>
+                <filteritem type="filename" name="*.xml" desc="This file is not used."/>
+                <filteritem type="filename" name="NEWS.pre-1-3" desc="This file is not used."/>
+                <filteritem type="filename" name="gen-unicode-tables.pl" desc="This file is not used."/>
+                <filteritem type="filepath" name="glib/pcre/pcre_chartables.c" desc="This file is not used"/>
+                <filteritem type="filepath" name="gobject/tests/closure-refcount.c" desc="This file is not used"/>
+                <filteritem type="filepath" name="gio/xdgmime/.*" desc="This file is not used"/>
+                <filteritem type="filepath" name="glib/valgrind.h" desc="This file is not used"/>
+                <filteritem type="filepath" name=".*COPYING" desc="License File"/>
+                <filteritem type="filepath" name="glib2.spec" desc="RPM description"/>
                 <filteritem type="filepath" name="README.OpenSource" desc="OpenSource README, not linked."/>
                 <filteritem type="filepath" name="glib-2.68.1.tar.xz" desc="OpenEuler:glib2 code. The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
+                <filteritem type="filename" name="Amsterdam-fat" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="Amsterdam-slim" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.m4" desc="This file is distributed under the same license as the PACKAGE package."/>  
+                <filteritem type="filename" name="*.expected" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.sxd" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.desktop" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.jpg" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.gif" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.pem" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.png" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.gmarkup" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.exe" desc="This file is distributed under the same license as the PACKAGE package."/>
+                <filteritem type="filename" name="*.odg" desc="This file is distributed under the same license as the PACKAGE package."/>
                 <filteritem type="filepath" name="BUILG.gn" desc="openEuler:glib2 build gn file."/>
                 <filteritem type="filepath" name="glib2.spec" desc="openEuler:glib2 spec."/>
                 <filteritem type="filepath" name="patch.tar.gz" desc="openEuler:glib2 origin patch."/>
