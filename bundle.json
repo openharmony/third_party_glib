@@ -27,7 +27,7 @@
                 "hiviewdfx_hilog_native",
                 "init"
               ],
-            "third_party": []
+            "third_party": [ "libffi" ]
         },
         "build": {
             "sub_component": [],
