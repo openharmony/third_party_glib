@@ -11,16 +11,23 @@
     "scripts": {},
     "licensePath": "COPYING",
     "component": {
-        "name": "thirdparty_glib",
-        "subsystem": "",
+        "name": "glib",
+        "subsystem": "thirdparty",
         "syscap": [],
         "features": [],
-        "adapted_system_type": [],
+        "adapted_system_type": [ "standard" ],
         "rom": "",
         "ram": "",
         "deps": {
-            "components": [],
-            "third_party": []
+            "components": [
+                "c_utils",
+                "faultloggerd",
+                "hisysevent_native",
+                "hitrace_native",
+                "hiviewdfx_hilog_native",
+                "init"
+              ],
+            "third_party": [ "libffi" ]
         },
         "build": {
             "sub_component": [],
