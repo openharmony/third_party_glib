@@ -22,9 +22,9 @@
             "components": [
                 "c_utils",
                 "faultloggerd",
-                "hisysevent_native",
-                "hitrace_native",
-                "hiviewdfx_hilog_native",
+                "hisysevent",
+                "hitrace",
+                "hilog",
                 "init"
               ],
             "third_party": [ "libffi" ]
