@@ -377,9 +377,9 @@ ohos_shared_library("g_mem_dfx") {
   external_deps = [
     "c_utils:utils",
     "faultloggerd:libdfx_dumpcatcher",
-    "hisysevent_native:libhisysevent",
-    "hitrace_native:hitrace_meter",
-    "hiviewdfx_hilog_native:libhilog",
+    "hilog:libhilog",
+    "hisysevent:libhisysevent",
+    "hitrace:hitrace_meter",
     "init:libbegetutil",
   ]
 
