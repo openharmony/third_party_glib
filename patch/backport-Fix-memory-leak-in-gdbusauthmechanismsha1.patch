@@ -1,0 +1,26 @@
+From 6ec432386ef98e26e5079b060ad823277e10f41f Mon Sep 17 00:00:00 2001
+From: Loic Le Page <llepage@fluendo.com>
+Date: Wed, 26 Jan 2022 14:20:08 +0100
+Subject: [PATCH] Fix memory leak in gio/gdbusauthmechanismsha1.c
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/6ec432386ef98e26e5079b060ad823277e10f41f
+
+---
+ gio/gdbusauthmechanismsha1.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gio/gdbusauthmechanismsha1.c b/gio/gdbusauthmechanismsha1.c
+index a82dddf839..8137b6352d 100644
+--- a/gio/gdbusauthmechanismsha1.c
++++ b/gio/gdbusauthmechanismsha1.c
+@@ -909,6 +909,7 @@ keyring_generate_entry (const gchar  *cookie_context,
+                                   _("(Additionally, releasing the lock for “%s” also failed: %s) "),
+                                   path,
+                                   local_error->message);
++                  g_error_free (local_error);
+                 }
+             }
+           else
+-- 
+GitLab

@@ -1,0 +1,52 @@
+From 9f1c59eef2e21b5a80c22d44deec2cba884cdfce Mon Sep 17 00:00:00 2001
+From: Egor Bychin <e.bychin@drweb.com>
+Date: Mon, 11 Oct 2021 15:31:01 +0300
+Subject: [PATCH] add OOM handling in mimemagic
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/9f1c59eef2e21b5a80c22d44deec2cba884cdfce
+
+---
+ gio/xdgmime/xdgmimemagic.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/gio/xdgmime/xdgmimemagic.c b/gio/xdgmime/xdgmimemagic.c
+index c68e27bedb..08b2c6da4f 100644
+--- a/gio/xdgmime/xdgmimemagic.c
++++ b/gio/xdgmime/xdgmimemagic.c
+@@ -103,6 +103,8 @@ _xdg_mime_magic_matchlet_new (void)
+   XdgMimeMagicMatchlet *matchlet;
+ 
+   matchlet = malloc (sizeof (XdgMimeMagicMatchlet));
++  if (matchlet == NULL)
++    return NULL;
+ 
+   matchlet->indent = 0;
+   matchlet->offset = 0;
+@@ -355,6 +357,11 @@ _xdg_mime_magic_parse_magic_line (FILE              *magic_file,
+     return XDG_MIME_MAGIC_ERROR;
+ 
+   matchlet = _xdg_mime_magic_matchlet_new ();
++
++  /* OOM */
++  if (matchlet == NULL)
++    return XDG_MIME_MAGIC_ERROR;
++
+   matchlet->indent = indent;
+   matchlet->offset = _xdg_mime_magic_read_a_number (magic_file, &end_of_file);
+   if (end_of_file)
+@@ -767,6 +774,11 @@ _xdg_mime_magic_read_magic_file (XdgMimeMagic *mime_magic,
+ 	{
+ 	case XDG_MIME_MAGIC_SECTION:
+ 	  match = _xdg_mime_magic_match_new ();
++
++	  /* OOM */
++	  if (match == NULL)
++	    return;
++
+ 	  state = _xdg_mime_magic_parse_header (magic_file, match);
+ 	  if (state == XDG_MIME_MAGIC_EOF || state == XDG_MIME_MAGIC_ERROR)
+ 	    _xdg_mime_magic_match_free (match);
+-- 
+GitLab
+

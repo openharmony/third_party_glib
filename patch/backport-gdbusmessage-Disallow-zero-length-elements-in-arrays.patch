@@ -1,0 +1,53 @@
+From c74177337dae7b06383261b2bedabf1f12d816b5 Mon Sep 17 00:00:00 2001
+From: Sebastian Wilhelmi <wilhelmi@google.com>
+Date: Thu, 6 Jan 2022 20:57:49 +0000
+Subject: [PATCH] gdbusmessage: Disallow zero-length elements in arrays
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+They are not allowed in the specification, and can lead to infinite
+loops when parsing.
+
+That鈥檚 a security issue if your application is accepting D-Bus messages
+from untrusted peers (perhaps in a peer-to-peer connection). It鈥檚 not
+exploitable when your application is connected to a bus (such as the
+system or session buses), as the bus daemons (dbus-daemon or
+dbus-broker) filter out such broken messages and don鈥檛 forward them.
+
+Arrays of zero-length elements are disallowed in the D-Bus
+specification: https://dbus.freedesktop.org/doc/dbus-specification.html#container-types
+
+oss-fuzz#41428, #41435
+Fixes: #2557
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/c74177337dae7b06383261b2bedabf1f12d816b5
+
+---
+ gio/gdbusmessage.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/gio/gdbusmessage.c b/gio/gdbusmessage.c
+index 4056bc2c4a..ecef6cd3c5 100644
+--- a/gio/gdbusmessage.c
++++ b/gio/gdbusmessage.c
+@@ -1839,6 +1839,16 @@ parse_value_from_blob (GMemoryBuffer       *buf,
+                         }
+                       g_variant_builder_add_value (&builder, item);
+                       g_variant_unref (item);
++
++                      /* Array elements must not be zero-length. There are no
++                       * valid zero-length serialisations of any types which
++                       * can be array elements in the D-Bus wire format, so this
++                       * assertion should always hold.
++                       *
++                       * See https://gitlab.gnome.org/GNOME/glib/-/issues/2557
++                       */
++                      g_assert (buf->pos > (gsize) offset);
++
+                       offset = buf->pos;
+                     }
+                 }
+-- 
+GitLab

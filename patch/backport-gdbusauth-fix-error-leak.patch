@@ -1,0 +1,27 @@
+From 2b29495bcb59ba00bec808c509112dae6e019fd7 Mon Sep 17 00:00:00 2001
+From: Michael Catanzaro <mcatanzaro@gnome.org>
+Date: Wed, 31 Mar 2021 14:12:39 -0500
+Subject: [PATCH] gdbusauth: fix error leak
+
+local_error is leaked in the G_IO_ERROR_NOT_SUPPORTED case. Found by
+Coverity.
+
+Conflict:NA
+Reference:https://github.com/GNOME/glib/commit/2b29495bcb59ba00bec808c509112dae6e019fd7
+
+---
+ gio/gdbusauth.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gio/gdbusauth.c b/gio/gdbusauth.c
+index c430f0cf03..534dca2d19 100644
+--- a/gio/gdbusauth.c
++++ b/gio/gdbusauth.c
+@@ -1007,6 +1007,7 @@ _g_dbus_auth_run_server (GDBusAuth              *auth,
+           g_propagate_error (error, local_error);
+           goto out;
+         }
++      g_clear_error (&local_error);
+     }
+   else
+     {
