@@ -3,8 +3,7 @@
 
 set -e
 cd $1
-# tar -zcvf patch.tar.gz *.patch
-find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
+find . ! -path "*/\.*" ! -path "./patch*" ! \( -name glib-2.68.1.tar.xz\
     -o -name BUILD.gn\
     -o -name config.gni\
     -o -name install.sh\
@@ -18,7 +17,6 @@ find . ! -path "*/\.*" ! \( -name patch.tar.gz -o -name glib-2.68.1.tar.xz\
     -o -name CONTRIBUTING.md\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
-tar -zxvf patch.tar.gz
 tar -xvf glib-2.68.1.tar.xz
 mv glib-2.68.1/* .
 rm -rf glib-2.68.1
@@ -27,9 +25,9 @@ file="backport-patch.log"
 exec < $file
 while read line
 do
-    line=${line:15}
+    line=${line:16}
     echo $line
-    patch -p1 < $line --fuzz=0 --no-backup-if-mismatch
+    patch -p1 < patch/$line --fuzz=0 --no-backup-if-mismatch
 done
 echo "all file patch success!"
 exit 0

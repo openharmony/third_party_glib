@@ -1,0 +1,77 @@
+From 80d3018c1d3e3abf3b2440140ceff8cefa5b8902 Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Fri, 4 Mar 2022 19:21:40 +0000
+Subject: [PATCH] =?UTF-8?q?tests:=20Make=20the=20642026=20test=20take=2010?=
+ =?UTF-8?q?0=C3=97=20less=20time?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+It’s a tradeoff of time against reproducibility of the failure conditions
+this test is testing for. If this test is run 100× on CI (which it will
+be every few weeks), that should be often enough to catch a regression
+here.
+
+A regression in this code is unlikely, though.
+
+This change is motivated by the fact that periodically this test times
+out, and even when it doesn’t, it takes on average 240s of CI runner
+time during each CI run. That’s a lot of resources.
+
+See: https://gitlab.gnome.org/GNOME/glib/-/jobs/1862013
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/80d3018c1d3e3abf3b2440140ceff8cefa5b8902
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+---
+ glib/tests/642026.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/glib/tests/642026.c b/glib/tests/642026.c
+index aface4ea02..6fed6cd08c 100644
+--- a/glib/tests/642026.c
++++ b/glib/tests/642026.c
+@@ -16,10 +16,6 @@
+ 
+ #include <glib.h>
+ 
+-/* On smcv's laptop, 1e4 iterations didn't always exhibit the bug, but 1e5
+- * iterations exhibited it 10/10 times in practice. YMMV. */
+-#define ITERATIONS 100000
+-
+ static GStaticPrivate sp;
+ static GMutex *mutex;
+ static GCond *cond;
+@@ -51,6 +47,19 @@ static gpointer thread_func (gpointer nil)
+ static void
+ testcase (void)
+ {
++  /* On smcv's laptop, 1e4 iterations didn't always exhibit the bug, but 1e5
++   * iterations exhibited it 10/10 times in practice. YMMV.
++   *
++   * If running with `-m slow` we want to try hard to reproduce the bug 10/10
++   * times. However, as of 2022 this takes around 240s on a CI machine, which
++   * is a long time to tie up those resources to verify that a bug fixed 10
++   * years ago is still fixed.
++   *
++   * So if running without `-m slow`, try 100× less hard to reproduce the bug,
++   * and rely on the fact that this is run under CI often enough to have a good
++   * chance of reproducing the bug in 1% of CI runs. */
++  const guint n_iterations = g_test_slow () ? 100000 : 1000;
++
+   g_test_bug ("642026");
+ 
+   mutex = g_mutex_new ();
+@@ -58,7 +67,7 @@ testcase (void)
+ 
+   g_mutex_lock (mutex);
+ 
+-  for (i = 0; i < ITERATIONS; i++)
++  for (i = 0; i < n_iterations; i++)
+     {
+       GThread *t1;
+ 
+-- 
+GitLab
+

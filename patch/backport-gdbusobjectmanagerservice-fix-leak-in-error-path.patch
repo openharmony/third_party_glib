@@ -1,0 +1,43 @@
+From 719484a5754cca036d123ae4c2ae3d150bacef32 Mon Sep 17 00:00:00 2001
+From: Michael Catanzaro <mcatanzaro@gnome.org>
+Date: Wed, 31 Mar 2021 14:23:13 -0500
+Subject: [PATCH] gdbusobjectmanagerservice: fix leak in error path
+
+If the third g_return_val_if_fail() is hit, then we leak
+orig_object_path. There is no reason we need to strdup it here.
+
+Found by Coverity.
+
+Conflict:NA
+Reference:https://github.com/GNOME/glib/commit/719484a5754cca036d123ae4c2ae3d150bacef32
+---
+ gio/gdbusobjectmanagerserver.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/gio/gdbusobjectmanagerserver.c b/gio/gdbusobjectmanagerserver.c
+index 39f4ed5006..0a0cea84ab 100644
+--- a/gio/gdbusobjectmanagerserver.c
++++ b/gio/gdbusobjectmanagerserver.c
+@@ -565,12 +565,12 @@ void
+ g_dbus_object_manager_server_export_uniquely (GDBusObjectManagerServer *manager,
+                                               GDBusObjectSkeleton      *object)
+ {
+-  gchar *orig_object_path;
++  const gchar *orig_object_path;
+   gchar *object_path;
+   guint count;
+   gboolean modified;
+ 
+-  orig_object_path = g_strdup (g_dbus_object_get_object_path (G_DBUS_OBJECT (object)));
++  orig_object_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (object));
+ 
+   g_return_if_fail (G_IS_DBUS_OBJECT_MANAGER_SERVER (manager));
+   g_return_if_fail (G_IS_DBUS_OBJECT (object));
+@@ -602,7 +602,6 @@ g_dbus_object_manager_server_export_uniquely (GDBusObjectManagerServer *manager,
+     g_dbus_object_skeleton_set_object_path (G_DBUS_OBJECT_SKELETON (object), object_path);
+ 
+   g_free (object_path);
+-  g_free (orig_object_path);
+ 
+ }
+ 
