@@ -1,0 +1,76 @@
+From d6ad10404f1d61d83803336ba5b64ec0bfd07da8 Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Wed, 9 Mar 2022 14:09:57 +0000
+Subject: [PATCH] tests: Add some tests for g_string_append_vprintf()
+
+This adds coverage of one previously uncovered branch in `gstring.c`.
+Real progress!
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/d6ad10404f1d61d83803336ba5b64ec0bfd07da8
+
+---
+ glib/tests/string.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/glib/tests/string.c b/glib/tests/string.c
+index 24098d1be6..0229099e79 100644
+--- a/glib/tests/string.c
++++ b/glib/tests/string.c
+@@ -215,6 +215,44 @@ test_string_append (void)
+   g_string_free (string, TRUE);
+ }
+ 
++static void string_append_vprintf_va (GString     *string,
++                                      const gchar *format,
++                                      ...) G_GNUC_PRINTF (2, 3);
++
++/* Wrapper around g_string_append_vprintf() which takes varargs */
++static void
++string_append_vprintf_va (GString     *string,
++                          const gchar *format,
++                          ...)
++{
++  va_list args;
++
++  va_start (args, format);
++  g_string_append_vprintf (string, format, args);
++  va_end (args);
++}
++
++static void
++test_string_append_vprintf (void)
++{
++  GString *string;
++
++  /* append */
++  string = g_string_new ("firsthalf");
++
++  string_append_vprintf_va (string, "some %s placeholders", "format");
++
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wformat"
++#pragma GCC diagnostic ignored "-Wformat-extra-args"
++  string_append_vprintf_va (string, "%l", "invalid");
++#pragma GCC diagnostic pop
++
++  g_assert_cmpstr (string->str, ==, "firsthalfsome format placeholders");
++
++  g_string_free (string, TRUE);
++}
++
+ static void
+ test_string_prepend_c (void)
+ {
+@@ -571,6 +609,7 @@ main (int   argc,
+   g_test_add_func ("/string/test-string-assign", test_string_assign);
+   g_test_add_func ("/string/test-string-append-c", test_string_append_c);
+   g_test_add_func ("/string/test-string-append", test_string_append);
++  g_test_add_func ("/string/test-string-append-vprintf", test_string_append_vprintf);
+   g_test_add_func ("/string/test-string-prepend-c", test_string_prepend_c);
+   g_test_add_func ("/string/test-string-prepend", test_string_prepend);
+   g_test_add_func ("/string/test-string-insert", test_string_insert);
+-- 
+GitLab

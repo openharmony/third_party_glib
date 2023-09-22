@@ -1,0 +1,81 @@
+From 76f5460107c86a44be6387c159b34ae50aa1e623 Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Thu, 17 Mar 2022 18:32:46 +0000
+Subject: [PATCH] gdbusmethodinvocation: Fix dead code for type checking GetAll
+
+`property_info` is only ever set for `Get` and `Set` calls, not for
+`GetAll`, as it only represents a single property. So this code was
+never reachable.
+
+Move it out so that it is reachable.
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/76f5460107c86a44be6387c159b34ae50aa1e623
+
+---
+ gio/gdbusmethodinvocation.c | 34 ++++++++++++++++++----------------
+ 1 file changed, 18 insertions(+), 16 deletions(-)
+
+diff --git a/gio/gdbusmethodinvocation.c b/gio/gdbusmethodinvocation.c
+index c15d83ec84..8e7abc83c4 100644
+--- a/gio/gdbusmethodinvocation.c
++++ b/gio/gdbusmethodinvocation.c
+@@ -424,7 +424,9 @@ g_dbus_method_invocation_return_value_internal (GDBusMethodInvocation *invocatio
+ 
+   /* property_info is only non-NULL if set that way from
+    * GDBusConnection, so this must be the case of async property
+-   * handling on either 'Get', 'Set' or 'GetAll'.
++   * handling on either 'Get' or 'Set'.
++   *
++   * property_info is NULL for 'GetAll'.
+    */
+   if (invocation->property_info != NULL)
+     {
+@@ -454,21 +456,6 @@ g_dbus_method_invocation_return_value_internal (GDBusMethodInvocation *invocatio
+           g_variant_unref (nested);
+         }
+ 
+-      else if (g_str_equal (invocation->method_name, "GetAll"))
+-        {
+-          if (!g_variant_is_of_type (parameters, G_VARIANT_TYPE ("(a{sv})")))
+-            {
+-              g_warning ("Type of return value for property 'GetAll' call should be '(a{sv})' but got '%s'",
+-                         g_variant_get_type_string (parameters));
+-              goto out;
+-            }
+-
+-          /* Could iterate the list of properties and make sure that all
+-           * of them are actually on the interface and with the correct
+-           * types, but let's not do that for now...
+-           */
+-        }
+-
+       else if (g_str_equal (invocation->method_name, "Set"))
+         {
+           if (!g_variant_is_of_type (parameters, G_VARIANT_TYPE_UNIT))
+@@ -482,6 +469,21 @@ g_dbus_method_invocation_return_value_internal (GDBusMethodInvocation *invocatio
+       else
+         g_assert_not_reached ();
+     }
++  else if (g_str_equal (invocation->interface_name, "org.freedesktop.DBus.Properties") &&
++           g_str_equal (invocation->method_name, "GetAll"))
++    {
++      if (!g_variant_is_of_type (parameters, G_VARIANT_TYPE ("(a{sv})")))
++        {
++          g_warning ("Type of return value for property 'GetAll' call should be '(a{sv})' but got '%s'",
++                     g_variant_get_type_string (parameters));
++          goto out;
++        }
++
++      /* Could iterate the list of properties and make sure that all
++       * of them are actually on the interface and with the correct
++       * types, but let's not do that for now...
++       */
++    }
+ 
+   if (G_UNLIKELY (_g_dbus_debug_return ()))
+     {
+-- 
+GitLab

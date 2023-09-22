@@ -1,0 +1,44 @@
+From 65b4bc30eb38b1484533a2ee08f7229a9e961af8 Mon Sep 17 00:00:00 2001
+From: Michael Catanzaro <mcatanzaro@gnome.org>
+Date: Wed, 31 Mar 2021 11:44:23 -0500
+Subject: [PATCH] gapplication: fix arguments leak in error path
+
+If this g_return_val_if_fail() is ever hit, then we leak arguments.
+This is not very important because if your code hits
+g_return_val_if_fail() you are invoking undefined behavior, a rather
+more serious problem, but let's replace it with g_critical() to be
+robust.
+
+This includes a small behavior change: it returns 1 rather than 0 in
+this error case.
+
+Found by Coverity.
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/65b4bc30eb38b1484533a2ee08f7229a9e961af8
+
+---
+ gio/gapplication.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/gio/gapplication.c b/gio/gapplication.c
+index 5a43202a5d..8e65176354 100644
+--- a/gio/gapplication.c
++++ b/gio/gapplication.c
+@@ -2524,7 +2524,12 @@ g_application_run (GApplication  *application,
+ 
+   context = g_main_context_default ();
+   acquired_context = g_main_context_acquire (context);
+-  g_return_val_if_fail (acquired_context, 0);
++  if (!acquired_context)
++    {
++      g_critical ("g_application_run() cannot acquire the default main context because it is already acquired by another thread!");
++      g_strfreev (arguments);
++      return 1;
++    }
+ 
+   if (!G_APPLICATION_GET_CLASS (application)
+         ->local_command_line (application, &arguments, &status))
+-- 
+GitLab
+

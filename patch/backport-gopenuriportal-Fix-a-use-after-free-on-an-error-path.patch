@@ -1,0 +1,39 @@
+From 969eb835dc2f07c34ae8ca45ddbc41590a2e2f8e Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Thu, 28 Apr 2022 10:56:10 +0100
+Subject: [PATCH] gopenuriportal: Fix a use-after-free on an error path
+
+`path` was used in building the error message after it had been freed.
+Spotted by scan-build.
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+
+Helps: #1767
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/969eb835dc2f07c34ae8ca45ddbc41590a2e2f8e
+
+---
+ gopenuriportal.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gio/gopenuriportal.c b/gio/gopenuriportal.c
+index ecf6fea..2f527d8 100644
+--- a/gio/gopenuriportal.c
++++ b/gio/gopenuriportal.c
+@@ -108,10 +108,10 @@ g_openuri_portal_open_uri (const char  *uri,
+       errsv = errno;
+       if (fd == -1)
+         {
+-          g_free (path);
+-          g_variant_builder_clear (&opt_builder);
+           g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errsv),
+                        "Failed to open '%s'", path);
++          g_free (path);
++          g_variant_builder_clear (&opt_builder);
+           return FALSE;
+         }
+ 
+-- 
+2.33.0
+

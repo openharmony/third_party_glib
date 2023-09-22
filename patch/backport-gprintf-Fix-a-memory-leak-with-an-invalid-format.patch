@@ -1,0 +1,38 @@
+From 7329c6e09bf59ccae2d8d3e788ce43bb6af6c3db Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Wed, 9 Mar 2022 14:07:34 +0000
+Subject: [PATCH] gprintf: Fix a memory leak with an invalid format in
+ g_vasprintf()
+
+If using the fallback implementation of `g_vasprintf()`.
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+
+Coverity CID: #1474726
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/7329c6e09bf59ccae2d8d3e788ce43bb6af6c3db
+
+---
+ glib/gprintf.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/glib/gprintf.c b/glib/gprintf.c
+index 555a630bc2..0e094f00fa 100644
+--- a/glib/gprintf.c
++++ b/glib/gprintf.c
+@@ -356,6 +356,12 @@ g_vasprintf (gchar      **string,
+ 
+     len = _g_vsprintf (*string, format, args2);
+     va_end (args2);
++
++    if (len < 0)
++      {
++        g_free (*string);
++        *string = NULL;
++      }
+   }
+ #endif
+ 
+-- 
+GitLab

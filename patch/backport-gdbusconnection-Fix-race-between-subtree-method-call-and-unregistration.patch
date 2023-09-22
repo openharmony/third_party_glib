@@ -1,0 +1,62 @@
+From 117b748e44e0ec930fcb9641e3f808572d4a41f2 Mon Sep 17 00:00:00 2001
+From: Philip Withnall <pwithnall@endlessos.org>
+Date: Fri, 24 Sep 2021 10:55:10 +0100
+Subject: [PATCH] gdbusconnection: Fix race between subtree method call and
+ unregistration
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Fix another variant of the previous commit, this time specific to the
+idle callback of a method call on a subtree object, racing with
+unregistration of that subtree.
+
+In this case, the `process_subtree_vtable_message_in_idle_cb()` idle
+callback already has a pointer to the right `ExportedSubtree` struct,
+but again doesn鈥檛 have a strong reference to it.
+
+Signed-off-by: Philip Withnall <pwithnall@endlessos.org>
+
+Helps: #2400
+
+Conflict:NA
+Reference:https://gitlab.gnome.org/GNOME/glib/-/commit/117b748e44e0ec930fcb9641e3f808572d4a41f2
+
+---
+ gio/gdbusconnection.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/gio/gdbusconnection.c b/gio/gdbusconnection.c
+index e6c0b70b4e..73b5b309a2 100644
+--- a/gio/gdbusconnection.c
++++ b/gio/gdbusconnection.c
+@@ -6824,14 +6824,15 @@ handle_subtree_method_invocation (GDBusConnection *connection,
+ 
+ typedef struct
+ {
+-  GDBusMessage *message;
+-  ExportedSubtree *es;
++  GDBusMessage *message;  /* (owned) */
++  ExportedSubtree *es;  /* (owned) */
+ } SubtreeDeferredData;
+ 
+ static void
+ subtree_deferred_data_free (SubtreeDeferredData *data)
+ {
+   g_object_unref (data->message);
++  exported_subtree_unref (data->es);
+   g_free (data);
+ }
+ 
+@@ -6890,7 +6891,7 @@ subtree_message_func (GDBusConnection *connection,
+ 
+   data = g_new0 (SubtreeDeferredData, 1);
+   data->message = g_object_ref (message);
+-  data->es = es;
++  data->es = exported_subtree_ref (es);
+ 
+   /* defer this call to an idle handler in the right thread */
+   idle_source = g_idle_source_new ();
+-- 
+GitLab
+
