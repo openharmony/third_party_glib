@@ -138,7 +138,7 @@ Note:If the text contains special characters, please escape them according to th
                 <filteritem type="filepath" name=".*COPYING" desc="License File"/>
                 <filteritem type="filepath" name="glib2.spec" desc="RPM description"/>
                 <filteritem type="filepath" name="README.OpenSource" desc="OpenSource README, not linked."/>
-                <filteritem type="filepath" name="glib-2.68.1.tar.xz" desc="OpenEuler:glib2 code. The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
+                <filteritem type="filepath" name="glib-2.72.2.tar.xz" desc="OpenEuler:glib2 code. The files involved in compilation are the LGPL protocol.They are used in dynamic link mode."/>
             </filefilter>
             <filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
                 <filteritem type="filename" name="Amsterdam-fat" desc="This file is distributed under the same license as the PACKAGE package."/>
@@ -158,7 +158,7 @@ Note:If the text contains special characters, please escape them according to th
                 <filteritem type="filepath" name="glib2.spec" desc="openEuler:glib2 spec."/>
                 <filteritem type="filepath" name="patch.tar.gz" desc="openEuler:glib2 origin patch."/>
                 <filteritem type="filepath" name="backport-patch.log" desc="openEuler:glib2 origin patch files name."/>
-                <filteritem type="filepath" name="glib-2.68.1.tar.xz" desc="openEuler:glib2 code."/>
+                <filteritem type="filepath" name="glib-2.72.2.tar.xz" desc="openEuler:glib2 code."/>
             </filefilter>
         </filefilterlist>
     </oatconfig>

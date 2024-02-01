@@ -1,7 +1,7 @@
 {
     "name": "@ohos/glib",
     "description": "GLib is the low-level core library that forms the basis for projects such as GTK and GNOME. It provides data structure handling for C, portability wrappers, and interfaces for such runtime functionality as an event loop, threads, dynamic loading, and an object system.",
-    "version": "2.68.1",
+    "version": "2.72.2",
     "license": "LGPL V2.1",
     "publishAs": "code-segment",
     "segment": {
