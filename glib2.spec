@@ -1,78 +1,88 @@
 Name:           glib2
-Version:        2.68.1
-Release:        10
+Version:        2.72.2
+Release:        13
 Summary:        The core library that forms the basis for projects such as GTK+ and GNOME
 License:        LGPLv2+
 URL:            http://www.gtk.org
-Source0:        http://download.gnome.org/sources/glib/2.68/glib-%{version}.tar.xz
+Source0:        https://download.gnome.org/sources/glib/2.71/glib-%{version}.tar.xz
 
-Patch6000:      backport-correctly-use-3-parameters-for-clise-range.patch
-Patch6001:      backport-fix-a-memory-leak.patch
-Patch6002:      backport-gfileenumerator-fix-leak-in-error-path.patch
-Patch6003:      backport-gdbusobjectmanagerservice-fix-leak-in-error-path.patch
-Patch6004:      backport-gdbusauth-fix-error-leak.patch
-Patch6005:      backport-gapplication-fix-arguments-leak-in-error-path.patch
-Patch6006:      backport-gsocks5proxy-Handle-EOF-when-reading-from-a-stream.patch
-Patch6007:      backport-application-Unset-the-registered-state-after-shutting-down.patch
-Patch6008:      backport-gdtlsconnection-Fix-a-check-for-a-vfunc-being-implemented.patch
-Patch6009:      backport-gthread-posix-Free-a-memory-leak-on-error-path.patch
-Patch6010:      backport-gutils-Avoid-segfault-in-g_get_user_database_entry.patch
-Patch6011:      backport-glocalfileinfo-Fix-atime-mtime-mix.patch
-Patch6012:      backport-gopenuriportal-Fix-GVariantBuilder-and-string-leakage.patch
-Patch6013:      backport-gproxyaddressenumerator-Fix-string-leakage-on-an-invalid-input.patch
-Patch6014:      backport-gsocks5proxy-Fix-buffer-overflow-on-a-really-long-domain-name.patch
-Patch6015:      backport-gvariant-Fix-memory-leak-on-a-TYPE-CHECK-failure.patch
-Patch6016:      backport-gvariant-Fix-pointers-being-dereferenced-despite-NULL-checks.patch
-Patch6017:      backport-gtype-Fix-pointer-being-dereferenced-despite-NULL-check.patch
-Patch6018:      backport-add-OOM-handling-in-mimemagic.patch
-Patch6019:      backport-garray-buffer-overflow-fix.patch
-Patch6020:      backport-gdbusconnection-Move-ExportedSubtree-definition.patch
-Patch6021:      backport-gdbusconnection-Add-some-ownership-annotations.patch
-Patch6022:      backport-gdbusconnection-Make-ExportedInterface-ExportedSubtree-refcounted.patch
-Patch6023:      backport-gdbusconnection-Fix-race-between-method-calls-and-object-unregistration.patch
-Patch6024:      backport-gdbusconnection-Fix-race-between-subtree-method-call-and-unregistration.patch
-Patch6025:      backport-Add-D-Bus-object-subtree-unregistration-tests.patch
-Patch6026:      backport-gutf8-add-string-length-check.patch
-Patch6027:      backport-garray-Fix-integer-overflows-in-element-capacity-calculations.patch
-Patch6028:      backport-gdbusmessage-Disallow-zero-length-elements-in-arrays.patch
-Patch6029:      backport-gvariant-serialiser-Prevent-unbounded-recursion.patch
-Patch6030:      backport-gutils-Fix-g_find_program_in_path-to-return-an-absolute-path.patch
-Patch6031:      backport-Fix-memory-leak-in-gdbusauthmechanismsha1.patch
-Patch6032:      backport-gprintf-Fix-a-memory-leak-with-an-invalid-format.patch
-Patch6033:      backport-tests-Add-some-tests-for-g_vasprintf-invalid-format-strings.patch
-Patch6034:      backport-tests-Add-some-tests-for-g_string_append_vprintf.patch
-Patch6035:      backport-gdbusmethodinvocation-Fix-a-leak-on-an-early-return-path.patch
-Patch6036:      backport-gdbusmethodinvocation-Fix-dead-code-for-type-checking-GetAll.patch
-Patch6037:      backport-gdbusmethodinvocation-Drop-redundant-quote-from-warning.patch
-Patch6038:      backport-tests-Add-unit-tests-for-GDBusMethodInvocation.patch
-Patch6039:      backport-gtestdbus-Print-the-dbus-address-on-a-specific-FD-intead-of-stdout.patch
-Patch6040:      backport-gopenuriportal-Fix-a-use-after-free-on-an-error-path.patch
-Patch6041:      backport-gio-tool-Fix-a-minor-memory-leak.patch
-Patch6042:      backport-gsocketclient-Fix-still-reachable-references-to-cancellables.patch
-Patch6043:      backport-gunixmounts-Add-cache-to-g_unix_mount_points_get.patch
-Patch6044:      backport-Add-lock-in-_g_get_unix_mount_points-around-fsent-functions.patch
-Patch6045:      backport-g_get_unix_mount_points-reduce-syscalls-inside-loop.patch
-Patch6046:      backport-xdgmime-fix-double-free.patch
-Patch6047:      backport-Implement-GFileIface.set_display_name-for-resource-files.patch
-Patch6048:      backport-tests-dbus-appinfo-Add-test-case-for-flatpak-opening-an-invalid-file.patch
-Patch6049:      backport-documentportal-Fix-small-leak-in-add_documents-with-empty-URI-list.patch
-Patch6050:      backport-gio-tests-gdbus-proxy-threads-Unref-GVariant-s-that-we-own.patch
-Patch6051:      backport-gio-tests-gdbus-peer-Unref-cached-property-GVariant-value.patch
-Patch6052:      backport-gdesktopappinfo-Unref-the-GDBus-call-results.patch
-Patch6053:      backport-Handling-collision-between-standard-i-o-file-descriptors-and-newly-created-ones.patch
-Patch6054:      backport-glocalfileoutputstream-Do-not-double-close-an-fd-on-unlink-error.patch
-Patch6055:      backport-tests-Make-the-642026-test-take-100x-less-time.patch
-Patch6056:      backport-gmessages-Add-missing-trailing-newline-in-fallback-log-hander.patch
-Patch6057:      backport-Revert-Handling-collision-between-standard-i-o-filedescriptors-and-newly-created-ones.patch
-patch6058:      backport-gdbusinterfaceskeleton-Fix-a-use-after-free-of-a-GDBusMethodInvocation.patch
-patch6059:      backport-CVE-2023-24593_CVE-2023-25180-1.patch
-patch6060:      backport-CVE-2023-24593_CVE-2023-25180-2.patch
-patch9000:      backport-lib-openharmony-glib.patch
+Patch6000:      backport-add-version-macros-for-GLib-2.74.patch
+Patch6001:      backport-gtype-Add-G_TYPE_FLAG_NONE.patch
+Patch6002:      backport-gioenums-Add-G_TLS_CERTIFICATE_FLAGS_NONE.patch
+Patch6003:      backport-gtestutils-Add-G_TEST_SUBPROCESS_DEFAULT.patch
+Patch6004:      backport-gsignal-Add-G_CONNECT_DEFAULT.patch
+Patch6005:      backport-giomodule-test-Dont-pass-a-magic-number-to-g_test_trap_subprocess.patch
+Patch6006:      backport-giochannel-Add-G_IO_FLAG_NONE.patch
+Patch6007:      backport-gmarkup-Add-G_MARKUP_PARSE_FLAGS_NONE.patch
+Patch6008:      backport-gregex-Add-G_REGEX_DEFAULT-G_REGEX_MATCH_DEFAULT.patch
+Patch6009:      backport-replace-pcre1-with-pcre2.patch
+Patch6010:      backport-gregex-format-specifier-for-localized-error-message.patch
+Patch6011:      backport-gregex-ensure-we-translate-the-errcode.patch
+Patch6012:      backport-gregex-Free-match-info-if-offset-matching-recalc-failed.patch
+Patch6013:      backport-gregex-use-G_REGEX_OPTIMIZE-flag-to-enable-JIT-compilation.patch
+Patch6014:      backport-gregex-use-g_debug-instead-of-g_warning-in-case-JIT-is-not-available.patch
+Patch6015:      backport-gregex-do-not-set-match-and-recursion-limits-on-match-context.patch
+Patch6016:      backport-gregex-add-original-test-case.patch
+Patch6017:      backport-gregex-use-correct-size-for-pcre2_pattern_info.patch
+Patch6018:      backport-regex-Add-debug-strings-for-compile-and-match-option-flags.patch
+Patch6019:      backport-regex-Actually-check-for-match-options-changes.patch
+Patch6020:      backport-regex-Do-not-mix-PCRE2-Compile-Match-Newline-and-BSR-flags.patch
+Patch6021:      backport-regex-Add-test-for-gtksourceview-regression.patch
+Patch6022:      backport-gregex-Mark-g_match_info_get_regex-as-transfer-none.patch
+Patch6023:      backport-gregex-Do-not-try-access-the-undefined-match-offsets.patch
+Patch6024:      backport-gregex-Fix-a-potential-PCRE2-code-leak-on-reallocation-failures.patch
+Patch6025:      backport-regex-Use-size-types-more-in-line-with-PCRE2-returned-values.patch
+Patch6026:      backport-gregex-Handle-the-case-we-need-to-re-allocate-the-match-data.patch
+Patch6027:      backport-gregex-Avoid-re-allocating-if-we-have-no-size-change.patch
+Patch6028:      backport-regex-Compute-the-offsets-size-based-on-match-results.patch
+Patch6029:      backport-regex-Avoid-allocating-offsets-until-we-ve-a-match.patch
+Patch6030:      backport-regex-Handle-JIT-errors-more-explicitly.patch
+Patch6031:      backport-regex-Make-possible-to-test-replacements-with-options.patch
+Patch6032:      backport-regex-Do-not-use-JIT-when-using-unsupported-match-options.patch
+Patch6033:      backport-regex-Perform-more-tests-both-with-and-without-optimizations.patch
+Patch6034:      backport-gsocketclient-Fix-still-reachable-references-to-cancellables.patch
+Patch6035:      backport-Add-lock-in-_g_get_unix_mount_points-around-fsent-functions.patch
+Patch6036:      backport-g_get_unix_mount_points-reduce-syscalls-inside-loop.patch
+Patch6037:      backport-xdgmime-fix-double-free.patch
+Patch6038:      backport-Implement-GFileIface.set_display_name-for-resource-files.patch
+Patch6039:      backport-tests-dbus-appinfo-Add-test-case-for-flatpak-opening-an-invalid-file.patch
+Patch6040:      backport-documentportal-Fix-small-leak-in-add_documents-with-empty-URI-list.patch
+Patch6041:      backport-gio-tests-gdbus-proxy-threads-Unref-GVariant-s-that-we-own.patch
+Patch6042:      backport-gio-tests-gdbus-peer-Unref-cached-property-GVariant-value.patch
+Patch6043:      backport-gdesktopappinfo-Unref-the-GDBus-call-results.patch
+Patch6044:      backport-Handling-collision-between-standard-i-o-file-descriptors-and-newly-created-ones.patch
+Patch6045:      backport-glocalfileoutputstream-Do-not-double-close-an-fd-on-unlink-error.patch
+Patch6046:      backport-gregex-Use-pcre2-error-messages-if-we-dont-provide-a-specific-one.patch
+Patch6047:      backport-regex-Use-critical-messages-if-an-unexpected-NULL-parameter-is-provided.patch
+Patch6048:      backport-gregex-Allow-G_REGEX_JAVASCRIPT_COMPAT-in-compile-mask-for-g_regex_new.patch
+Patch6049:      backport-gregex-Drop-explanation-G_REGEX_JAVASCRIPT_COMPAT.patch
+Patch6050:      backport-gregex-Remove-an-unreachable-return-statement.patch
+Patch6051:      backport-gmessages-Add-missing-trailing-newline-in-fallback-log-hander.patch
+Patch6052:      backport-Revert-Handling-collision-between-standard-i-o-filedescriptors-and-newly-created-ones.patch
+patch6053:      backport-gdbusinterfaceskeleton-Fix-a-use-after-free-of-a-GDBusMethodInvocation.patch
+patch6054:      backport-CVE-2023-24593_CVE-2023-25180-1.patch
+patch6055:      backport-CVE-2023-24593_CVE-2023-25180-2.patch
+patch6056:      backport-gdbusconnection-Fix-double-unref-on-timeout-cancel-sending-a-message.patch
+patch6057:      backport-add-g_free_sized-and-g_aligned_free_sized.patch
+patch6058:      backport-gkeyfile-Fix-group-comment-management.patch
+patch6059:      backport-gkeyfile-Ensure-we-don-t-add-extra-blank-line-above-new-group.patch
+patch6060:      backport-gkeyfile-Skip-group-comment-when-adding-a-new-key-to-a-group.patch
+patch6061:      backport-glocalfilemonitor-Avoid-file-monitor-destruction-from-event-thread.patch
+patch6062:      backport-glocalfilemonitor-Skip-event-handling-if-the-source-has-been-destroyed.patch
+patch6063:      backport-tests-Add-a-test-for-GFileMonitor-deadlocks.patch
+
+Patch6064:      backport-gregex-set-default-max-stack-size-for-PCRE2-JIT-compiler-to-512KiB.patch
+Patch6065:      backport-gregex-if-JIT-stack-limit-is-reached-fall-back-to-interpretive-matching.patch
+Patch6066:      backport-Make-sure-the-GTask-is-freed-on-a-graceful-disconnect.patch
+Patch6067:      backport-gmessages-fix-dropping-irrelevant-log-domains.patch
+Patch6068:      backport-gutils-Fix-an-unlikely-minor-leak-in-g_build_user_data_dir.patch
+Patch6069:      backport-openharmony-adapt.patch
+Patch6070:      backport-openharmony-dummy.patch
 
 BuildRequires:  chrpath gcc gcc-c++ gettext perl-interpreter
 BUildRequires:  glibc-devel libattr-devel libselinux-devel meson
 BuildRequires:  systemtap-sdt-devel pkgconfig(libelf) pkgconfig(libffi)
-BuildRequires:  pkgconfig(libpcre) pkgconfig(mount) pkgconfig(zlib)
+BuildRequires:  pkgconfig(libpcre2-8) pkgconfig(mount) pkgconfig(zlib)
 BuildRequires:  python3-devel
 %ifnarch i686
 BuildRequires:  desktop-file-utils shared-mime-info gtk-doc 
@@ -81,12 +91,16 @@ BuildRequires:  pkgconfig(sysprof-capture-4)
 %endif
 %endif
 
-Provides:       %{name}-fam = %{version}-%{release}
-Obsoletes:      %{name}-fam < %{version}-%{release}
+Provides:  %{name}-fam = %{version}-%{release}
+Obsoletes: %{name}-fam < %{version}-%{release}
 
 Recommends:     shared-mime-info
-
 Conflicts:      gcr < 3.28.1
+
+Provides: bundled(gnulib)
+Provides: bundled(gvdb)
+Provides: bundled(libcharset)
+Provides: bundled(xdgmime)
 
 %description
 GLib is a bundle of three (formerly five) low-level system libraries
@@ -95,17 +109,35 @@ from GTK, so it can be used by software other than GNOME and has been
 developed in parallel ever since.
 
 %package        devel
-Summary:        Development and test files for the GLib library
+Summary:        Development for the GLib library
 Requires:       %{name} = %{version}-%{release}
 Requires:       gdb-headless
 
+%description    devel
+Development for the GLib library.
+
+%package        static
+Summary:        glib static
+Requires:       pcre2-static
+%if %{?openEuler:1}0
+Requires:       sysprof-capture-static
+%endif
+Requires:       %{name}-devel = %{version}-%{release}
 Provides:       %{name}-static = %{version}-%{release}
-Provides:       %{name}-tests = %{version}-%{release}
 Obsoletes:      %{name}-static < %{version}-%{release}
+
+%description    static
+The %{name}-static subpackage contains libraries for %{name}.
+
+%package        tests
+Summary:        Tests for the glib2 package
+Requires:       %{name}-devel = %{version}-%{release}
+Provides:       %{name}-tests = %{version}-%{release}
 Obsoletes:      %{name}-tests < %{version}-%{release}
 
-%description    devel
-Development and test files for the GLib library.
+%description    tests
+The glib2-tests package contains tests that can be used to verify
+the functionality of the installed package.
 
 %ifnarch i686
 %package        help
@@ -122,7 +154,7 @@ help document for the glib2 package.
 %autosetup -n glib-%{version} -p1
 
 %build
-rm glib/pcre/*.[ch]
+
 %meson --default-library=both  -Ddtrace=true  \
 %ifnarch i686
 %if %{?openEuler:1}0
@@ -136,7 +168,6 @@ rm glib/pcre/*.[ch]
     -Dglib_debug=disabled
 
 %meson_build
-
 find . -name *.dtrace-temp.c -exec rm -f {} \;
 
 %check
@@ -144,14 +175,16 @@ find . -name *.dtrace-temp.c -exec rm -f {} \;
 
 %install
 %meson_install
+%global py_reproducible_pyc_path %{buildroot}%{_datadir}
 touch -r gio/gdbus-2.0/codegen/config.py.in %{buildroot}%{_datadir}/glib-2.0/codegen/*.py
 chrpath --delete %{buildroot}%{_libdir}/*.so
 
 export PYTHONHASHSEED=0
 %py_byte_compile %{__python3} %{buildroot}%{_datadir}
 
-mv  %{buildroot}%{_bindir}/gio-querymodules %{buildroot}%{_bindir}/gio-querymodules-%{__isa_bits}
-mkdir -p %{buildroot}%{_libdir}/gio/modules/
+mv %{buildroot}%{_bindir}/gio-querymodules %{buildroot}%{_bindir}/gio-querymodules-%{__isa_bits}
+sed -i -e "/^gio_querymodules=/s/gio-querymodules/gio-querymodules-%{__isa_bits}/" %{buildroot}%{_libdir}/pkgconfig/gio-2.0.pc
+mkdir -p %{buildroot}%{_libdir}/gio/modules
 touch %{buildroot}%{_libdir}/gio/modules/giomodule.cache
 
 # remove pycache
@@ -202,11 +235,7 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 %{_libdir}/lib*.so
 %{_libdir}/glib-2.0
 %{_libdir}/pkgconfig/*
-%{_libdir}/*.a
 %{_includedir}/*
-%{_libexecdir}/installed-tests
-%exclude %{_libexecdir}/installed-tests/glib/cert-tests
-%exclude %{_libexecdir}/installed-tests/glib/tls-certificate
 
 %{_datadir}/aclocal/*
 %{_datadir}/glib-2.0/*
@@ -214,8 +243,6 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 %{_datadir}/gdb/auto-load/%{_libdir}/*-gdb.py
 %{_datadir}/gettext/
 %{_datadir}/systemtap/
-%{_datadir}/installed-tests
-%exclude %{_datadir}/installed-tests/glib/tls-certificate.test
 
 %{_bindir}/glib-genmarshal
 %{_bindir}/glib-gettextize
@@ -227,6 +254,17 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 %{_bindir}/gresource
 %attr (0755, root, root) %{_bindir}/gtester-report
 
+%files static
+%{_libdir}/*.a
+
+%files tests
+%{_libexecdir}/installed-tests
+%exclude %{_libexecdir}/installed-tests/glib/cert-tests
+%exclude %{_libexecdir}/installed-tests/glib/tls-certificate
+
+%{_datadir}/installed-tests
+%exclude %{_datadir}/installed-tests/glib/tls-certificate.test
+
 %ifnarch i686
 %files help
 %defattr(-,root,root)
@@ -235,6 +273,56 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 %endif
 
 %changelog
+* Thu Jan 11 2024 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-13
+- fix pcre2 error , memory leak and log domains error
+
+* Mon Sep 25 2023 liningjie <liningjie@xfusion.com> - 2.72.2-12
+- glocalfilemonitor: Avoid file monitor destruction from event thread
+
+* Sat Aug 19 2023 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-11
+- fix double unref and fix group comment management
+
+* Sat Apr 1 2023 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-10
+- fix CVE-2023-24593 and CVE-2023-25180
+
+* Tue Mar 14 2023 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-9
+- fix a use-after-free of GDBusMethodInvocation
+
+* Thu Feb 16 2023 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-8
+- backport some patches from community
+
+* Tue Jan 10 2023 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-7
+- adjust pcre2 requires
+
+* Tue Dec 27 2022 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-6
+- fix some pcre2 error
+
+* Wed Nov 9 2022 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-5
+- separate the test and static package from devel package
+
+* Sat Oct 15 2022 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-4
+- backport some patches from community
+
+* Mon Sep 5 2022 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-3
+- replace pcre1 with pcre2
+
+* Sat Jun 18 2022 zhujunhao <zhujunhao11@huawei.com> - 2.72.2-2
+- remove gnutls require
+
+* Mon Jun 6 2022 lin zhang <lin.zhang@turbolinux.com.cn> - 2.72.2-1
+- Update to 2.72.2
+
+* Thu Jun 2 2022 lin zhang <lin.zhang@turbolinux.com.cn> - 2.72.0-1
+- Update to 2.72.0
+
+* Thu Apr 28 2022 yanan <yanan@huawei.com> - 2.68.1-12
+- Type:bugfix
+- DESC:fix issues found by svace static code analyzer
+       fix segfault,memory leak,EOF,arguments leak
+
+* Wed Apr 6 2022 hanhui <hanhui15@h-partners.com> - 2.68.1-11
+- DESC:fix gfileenumerator/gdbusobjectmanagerservice/gdbusauth of memory leak
+
 * Fri Mar 11 2022 weijin deng <weijin.deng@turbolinux.com.cn> - 2.68.1-10
 - Type:bugfix
 - DESC:solve glib2 enable "glib2_debug" option causes gnome-calendar reopen

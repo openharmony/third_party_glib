@@ -3,7 +3,7 @@
 
 set -e
 cd $1
-find . ! -path "*/\.*" ! -path "./patch*" ! \( -name glib-2.68.1.tar.xz\
+find . ! -path "*/\.*" ! -path "./patch*" ! \( -name glib-2.72.2.tar.xz\
     -o -name BUILD.gn\
     -o -name config.gni\
     -o -name install.sh\
@@ -14,12 +14,14 @@ find . ! -path "*/\.*" ! -path "./patch*" ! \( -name glib-2.68.1.tar.xz\
     -o -name COPYING\
     -o -name backport-patch.log\
     -o -name "README*"\
+    -o -name "NEWS*"\
+    -o -name SECURITY.md\
     -o -name CONTRIBUTING.md\
     -o -name ".*" \)\
     -prune -print -exec rm -rf {} \;
-tar -xvf glib-2.68.1.tar.xz
-mv glib-2.68.1/* .
-rm -rf glib-2.68.1
+tar -xvf glib-2.72.2.tar.xz
+mv glib-2.72.2/* .
+rm -rf glib-2.72.2
 echo "reset working dir success"
 file="backport-patch.log"
 exec < $file
