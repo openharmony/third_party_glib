@@ -1,6 +1,6 @@
 Name:           glib2
 Version:        2.72.2
-Release:        13
+Release:        14
 Summary:        The core library that forms the basis for projects such as GTK+ and GNOME
 License:        LGPLv2+
 URL:            http://www.gtk.org
@@ -79,6 +79,7 @@ Patch6068:      backport-gutils-Fix-an-unlikely-minor-leak-in-g_build_user_data_
 Patch6069:      backport-openharmony-adapt.patch
 Patch6070:      backport-openharmony-dummy.patch
 
+
 BuildRequires:  chrpath gcc gcc-c++ gettext perl-interpreter
 BUildRequires:  glibc-devel libattr-devel libselinux-devel meson
 BuildRequires:  systemtap-sdt-devel pkgconfig(libelf) pkgconfig(libffi)
@@ -86,9 +87,6 @@ BuildRequires:  pkgconfig(libpcre2-8) pkgconfig(mount) pkgconfig(zlib)
 BuildRequires:  python3-devel
 %ifnarch i686
 BuildRequires:  desktop-file-utils shared-mime-info gtk-doc 
-%if %{?openEuler:1}0
-BuildRequires:  pkgconfig(sysprof-capture-4)
-%endif
 %endif
 
 Provides:  %{name}-fam = %{version}-%{release}
@@ -119,9 +117,6 @@ Development for the GLib library.
 %package        static
 Summary:        glib static
 Requires:       pcre2-static
-%if %{?openEuler:1}0
-Requires:       sysprof-capture-static
-%endif
 Requires:       %{name}-devel = %{version}-%{release}
 Provides:       %{name}-static = %{version}-%{release}
 Obsoletes:      %{name}-static < %{version}-%{release}
@@ -157,15 +152,12 @@ help document for the glib2 package.
 
 %meson --default-library=both  -Ddtrace=true  \
 %ifnarch i686
-%if %{?openEuler:1}0
-    -Dsysprof=enabled \
-%endif
     -Dman=true -Dgtk_doc=true \
 %else
-    -Dsysprof=disabled -Dman=false -Dgtk_doc=false \
+    -Dman=false -Dgtk_doc=false \
 %endif
     -Dsystemtap=true -Dinstalled_tests=true \
-    -Dglib_debug=disabled
+    -Dglib_debug=disabled -Dsysprof=disabled 
 
 %meson_build
 find . -name *.dtrace-temp.c -exec rm -f {} \;
@@ -273,6 +265,9 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 %endif
 
 %changelog
+* Mon Feb 19 2024 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-14
+- disable sysprof
+
 * Thu Jan 11 2024 hanhuihui <hanhuihui5@huawei.com> - 2.72.2-13
 - fix pcre2 error , memory leak and log domains error
 
