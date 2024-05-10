@@ -292,7 +292,6 @@ config("gobject_config") {
     ".",
     "gobject",
     "glib",
-    "//third_party/libffi/include",
   ]
   cflags = [
     "-DG_LOG_DOMAIN=\"GObject\"",
@@ -326,14 +325,17 @@ ohos_source_set("gobject_source") {
   ]
 
   configs = [ ":gobject_config" ]
+
+  external_deps = [ "libffi:ffi" ]
 }
 
 ohos_shared_library("gobject") {
   deps = [
     ":glib",
     ":gobject_source",
-    "//third_party/libffi:ffi",
   ]
+
+  external_deps = [ "libffi:ffi" ]
   part_name = "glib"
   subsystem_name = "thirdparty"
 }

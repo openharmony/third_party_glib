@@ -25,9 +25,10 @@
                 "hisysevent",
                 "hitrace",
                 "hilog",
-                "init"
+                "init",
+                "libffi"
               ],
-            "third_party": [ "libffi" ]
+            "third_party": []
         },
         "build": {
             "sub_component": [],
