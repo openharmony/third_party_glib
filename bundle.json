@@ -32,7 +32,23 @@
         },
         "build": {
             "sub_component": [],
-            "inner_kits": [],
+            "inner_kits": [
+                {
+                    "name": "//third_party/glib:glibpcre"
+                },
+                {
+                    "name": "//third_party/glib:glib"
+                },
+                {
+                    "name": "//third_party/glib:gmodule"
+                },
+                {
+                    "name": "//third_party/glib:gobject"
+                },
+                {
+                    "name": "//third_party/glib:g_mem_dfx"
+                }
+            ],
             "test": []
         }
     }
