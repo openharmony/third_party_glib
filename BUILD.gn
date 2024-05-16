@@ -327,6 +327,8 @@ ohos_source_set("gobject_source") {
   configs = [ ":gobject_config" ]
 
   external_deps = [ "libffi:ffi" ]
+  part_name = "glib"
+  subsystem_name = "thirdparty"
 }
 
 ohos_shared_library("gobject") {
