@@ -94,7 +94,6 @@ ohos_shared_library("glibpcre") {
     "-DPCRE2_CODE_UNIT_WIDTH=8",
     "-w",
   ]
-  innerapi_tags = [ "platformsdk" ]
   part_name = "glib"
   subsystem_name = "thirdparty"
 }
@@ -257,7 +256,6 @@ ohos_shared_library("glib") {
   if (is_standard_system) {
     deps += [ ":g_mem_dfx" ]
   }
-  innerapi_tags = [ "platformsdk" ]
   part_name = "glib"
   subsystem_name = "thirdparty"
 }
@@ -327,6 +325,8 @@ ohos_source_set("gobject_source") {
   configs = [ ":gobject_config" ]
 
   external_deps = [ "libffi:ffi" ]
+  part_name = "glib"
+  subsystem_name = "thirdparty"
 }
 
 ohos_shared_library("gobject") {
@@ -387,7 +387,6 @@ ohos_shared_library("g_mem_dfx") {
     "init:libbegetutil",
   ]
 
-  innerapi_tags = [ "platformsdk" ]
   subsystem_name = "thirdparty"
   part_name = "glib"
 }
