@@ -251,7 +251,10 @@ ohos_source_set("glib_source") {
 }
 
 config("public_header_config") {
-  include_dirs = [ "glib" ]
+  include_dirs = [
+    ".",
+    "glib",
+  ]
 }
 
 ohos_shared_library("glib") {
