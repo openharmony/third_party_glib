@@ -260,7 +260,6 @@ ohos_shared_library("glib") {
     "//third_party/glib:glibpcre",
   ]
   public_configs = [ ":public_header_config" ]
-  configs = [ ":glib_config" ]
   if (is_standard_system) {
     deps += [ ":g_mem_dfx" ]
   }
