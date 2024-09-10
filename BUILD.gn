@@ -151,6 +151,7 @@ config("glib_config") {
 }
 
 ohos_source_set("glib_source") {
+  branch_protector_ret = "pac_ret"
   sources = [
     "glib/deprecated/gallocator.c",
     "glib/deprecated/gcache.c",
@@ -258,6 +259,7 @@ config("public_header_config") {
 }
 
 ohos_shared_library("glib") {
+  branch_protector_ret = "pac_ret"
   deps = [
     ":glib_source",
     "//third_party/glib:glibpcre",
@@ -365,6 +367,7 @@ config("g_mem_dfx_config") {
 }
 
 ohos_shared_library("g_mem_dfx") {
+  branch_protector_ret = "pac_ret"
   sources = [ "glibmemdfx/gmemdfx.cpp" ]
 
   include_dirs = [ "//commonlibrary/c_utils/base/include" ]
