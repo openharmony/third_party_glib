@@ -18056,3 +18056,4 @@ index 1ab3bee..02d35e7 100644
        want_alloc = MAX (want_alloc, MIN_ARRAY_SIZE);
  
        array->data = g_realloc (array->data, want_alloc);
+diff
