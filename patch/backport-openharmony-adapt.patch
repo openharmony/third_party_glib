@@ -18064,7 +18064,7 @@ diff --git a/gio/gsocks4aproxy.c b/gio/gsocks4aproxy.c
 index 3dad118eb7..b3146d08fd 100644
 --- a/gio/gsocks4aproxy.c
 +++ b/gio/gsocks4aproxy.c
-@@ -79,9 +79,9 @@ g_socks4a_proxy_init (GSocks4aProxy *proxy)
+@@ -77,9 +77,9 @@ g_socks4a_proxy_init (GSocks4aProxy *proxy)
   * +----+----+----+----+----+----+----+----+----+----+....+----+------+....+------+
   * | VN | CD | DSTPORT |      DSTIP        | USERID       |NULL| HOST |    | NULL |
   * +----+----+----+----+----+----+----+----+----+----+....+----+------+....+------+
