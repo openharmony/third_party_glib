@@ -18076,3 +18076,4 @@ index 3dad118eb7..b3146d08fd 100644
  static gint
  set_connect_msg (guint8      *msg,
  		 const gchar *hostname,
+
