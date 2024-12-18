@@ -69,3 +69,4 @@ Patch6067:      backport-gmessages-fix-dropping-irrelevant-log-domains.patch
 Patch6068:      backport-gutils-Fix-an-unlikely-minor-leak-in-g_build_user_data_dir.patch
 Patch6069:      backport-openharmony-adapt.patch
 Patch6070:      backport-openharmony-dummy.patch
+Patch6071:      backport-CVE-2024-34397.patch
