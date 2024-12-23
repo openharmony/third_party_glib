@@ -361,7 +361,6 @@ ohos_shared_library("gobject") {
 config("g_mem_dfx_config") {
   include_dirs = [
     "glibmemdfx",
-    "//commonlibrary/c_utils/base/include",
     "//foundation/multimedia/media_standard/interfaces/inner_api/native",
     "//base/hiviewdfx/hisysevent/interfaces/native/innerkits/hisysevent/include",
   ]
@@ -370,8 +369,6 @@ config("g_mem_dfx_config") {
 ohos_shared_library("g_mem_dfx") {
   branch_protector_ret = "pac_ret"
   sources = [ "glibmemdfx/gmemdfx.cpp" ]
-
-  include_dirs = [ "//commonlibrary/c_utils/base/include" ]
 
   cflags = [
     "-std=c++17",
