@@ -60,6 +60,7 @@ ohos_shared_library("glibpcre") {
   sources = [
     "$PCRE2_LIB_DIR/src/pcre2_auto_possess.c",
     "$PCRE2_LIB_DIR/src/pcre2_chartables.c",
+    "$PCRE2_LIB_DIR/src/pcre2_chkdint.c",
     "$PCRE2_LIB_DIR/src/pcre2_compile.c",
     "$PCRE2_LIB_DIR/src/pcre2_config.c",
     "$PCRE2_LIB_DIR/src/pcre2_context.c",
