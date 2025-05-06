@@ -7,59 +7,16 @@ glib_path = rebase_path("//third_party/glib")
 exec_script("install.sh", [ "$glib_path" ])
 
 PCRE2_LIB_DIR = "//third_party/pcre2/pcre2"
+PCRE2_OUT_DIR = get_label_info("pcre2:publish_generic_file", "target_out_dir")
 
 ohos_shared_library("glibpcre") {
   branch_protector_ret = "pac_ret"
-  md5_check_script = rebase_path("$PCRE2_LIB_DIR/check_md5.sh")
-  _arguments_config = [
-    rebase_path("$PCRE2_LIB_DIR/src/config.h.generic"),
-    rebase_path("$PCRE2_LIB_DIR/src/config.h"),
+  external_deps = [
+    "pcre2:publish_generic_file",
+    "pcre2:pcre2_generated_headers",
   ]
-
-  check_config_result =
-      exec_script(md5_check_script, _arguments_config, "string")
-  if (check_config_result == "") {
-    exec_script("/usr/bin/env",
-                [
-                  "cp",
-                  rebase_path("$PCRE2_LIB_DIR/src/config.h.generic"),
-                  rebase_path("$PCRE2_LIB_DIR/src/config.h"),
-                ])
-  }
-
-  _arguments_pcre2 = [
-    rebase_path("$PCRE2_LIB_DIR/src/pcre2.h.generic"),
-    rebase_path("$PCRE2_LIB_DIR/src/pcre2.h"),
-  ]
-
-  check_pcre2_result = exec_script(md5_check_script, _arguments_pcre2, "string")
-  if (check_pcre2_result == "") {
-    exec_script("/usr/bin/env",
-                [
-                  "cp",
-                  rebase_path("$PCRE2_LIB_DIR/src/pcre2.h.generic"),
-                  rebase_path("$PCRE2_LIB_DIR/src/pcre2.h"),
-                ])
-  }
-
-  _arguments_pcre2_chartables = [
-    rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c.dist"),
-    rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c"),
-  ]
-
-  check_pcre2_chartables_result =
-      exec_script(md5_check_script, _arguments_pcre2_chartables, "string")
-  if (check_pcre2_chartables_result == "") {
-    exec_script("/usr/bin/env",
-                [
-                  "cp",
-                  rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c.dist"),
-                  rebase_path("$PCRE2_LIB_DIR/src/pcre2_chartables.c"),
-                ])
-  }
   sources = [
     "$PCRE2_LIB_DIR/src/pcre2_auto_possess.c",
-    "$PCRE2_LIB_DIR/src/pcre2_chartables.c",
     "$PCRE2_LIB_DIR/src/pcre2_chkdint.c",
     "$PCRE2_LIB_DIR/src/pcre2_compile.c",
     "$PCRE2_LIB_DIR/src/pcre2_config.c",
@@ -87,7 +44,10 @@ ohos_shared_library("glibpcre") {
     "$PCRE2_LIB_DIR/src/pcre2_valid_utf.c",
     "$PCRE2_LIB_DIR/src/pcre2_xclass.c",
   ]
+  sources += [ "${PCRE2_OUT_DIR}/pcre2_chartables.c" ]
+
   include_dirs = [ "$PCRE2_LIB_DIR/src" ]
+
   cflags = [
     "-D_GNU_SOURCE",
     "-DHAVE_CONFIG_H",
@@ -120,6 +80,7 @@ config("glib_config") {
     "//foundation/multimedia/media_standard/services/utils",
     "glibmemdfx",
   ]
+
   cflags = [
     "-DG_LOG_DOMAIN=\"GLib\"",
     "-DGLIB_CHARSETALIAS_DIR=\"system/lib64\"",
@@ -249,8 +210,13 @@ ohos_source_set("glib_source") {
     "glib/gwakeup.c",
     "glib/libcharset/localcharset.c",
   ]
-
+  external_deps = [
+    "pcre2:publish_generic_file",
+    "pcre2:pcre2_generated_headers"
+  ]
   configs = [ ":glib_config" ]
+  part_name = "glib"
+  subsystem_name = "thirdparty"
 }
 
 config("public_header_config") {
