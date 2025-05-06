@@ -26,7 +26,8 @@
                 "hitrace",
                 "hilog",
                 "init",
-                "libffi"
+                "libffi",
+                "pcre2"
               ],
             "third_party": []
         },
